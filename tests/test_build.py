@@ -65,8 +65,8 @@ class BuildTest(unittest.TestCase):
     def test_no_agency_leftovers(self):
         # Движок взят у alfimov.kz — в собранном сайте не должно остаться агентских адресов и текстов.
         for f in build.DIST.rglob("*"):
-            # api/_tg.php — общий с alfimov.kz файл бота (бот один на оба сайта), там домен главного сайта по умолчанию
-            if f.suffix in (".html", ".php", ".json", ".tpl", ".txt", ".js", ".css") and f.name != "_tg.php":
+            # api/_tg.php и подсказка в админке — про общий с alfimov.kz бот (бот один на оба сайта)
+            if f.suffix in (".html", ".php", ".json", ".tpl", ".txt", ".js", ".css") and f.name not in ("_tg.php", "admin.tpl"):
                 t = f.read_text(encoding="utf-8")
                 self.assertNotIn("alfimov.kz", t, str(f))
                 self.assertNotIn("агентств", t.lower(), str(f))
