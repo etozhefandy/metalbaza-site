@@ -6,14 +6,15 @@ set -euo pipefail
 cd "$(dirname "$0")"
 REPO="$PWD"
 HOST=$(python3 -c "import sys; sys.path.insert(0, 'src'); import siteconf; print(siteconf.HOST)")
+git submodule update --init --quiet   # общий движок сайтов (engine/)
 python3 build.py
 # PHP-блог и админка: синтаксис и тесты (если php есть на этом компьютере).
 if command -v php >/dev/null; then
   for f in $(find dist -name '*.php'); do php -l "$f" >/dev/null || { echo "Ошибка PHP в $f"; exit 1; }; done
-  for t in tests/php/test_*.php; do php "$t" >/dev/null || { php "$t" | grep FAIL; echo "Выкладка остановлена: $t"; exit 1; }; done
+  for t in engine/tests/php/test_*.php; do php "$t" "$REPO" >/dev/null || { php "$t" "$REPO" | grep FAIL; echo "Выкладка остановлена: $t"; exit 1; }; done
 fi
 # Критичные SEO-ошибки (битые ссылки, дубли title, нет H1) — не выкладываем.
-python3 seo_audit.py >/dev/null || { python3 seo_audit.py | grep '\[critical\]'; echo 'Выкладка остановлена: исправьте critical-ошибки SEO-аудита'; exit 1; }
+python3 engine/seo_audit.py dist >/dev/null || { python3 engine/seo_audit.py dist | grep '\[critical\]'; echo 'Выкладка остановлена: исправьте critical-ошибки SEO-аудита'; exit 1; }
 REMOTE="$(git remote get-url origin)"
 SRC_SHA="$(git rev-parse --short HEAD)"
 TMP="$(mktemp -d)"

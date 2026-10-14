@@ -5,22 +5,24 @@ SEO-сайт заявок на металлопрокат: покупатель 
 
 ## Как устроено
 
+Сайт = свои страницы + **общий движок** `engine/` (git submodule, репозиторий etozhefandy/site-engine — один и тот же
+у alfimov.kz, metalbaza.kz и будущих сайтов): блог, ИИ-автор, очередь статей и автопилот, SEO-автопилот, админка,
+форма заявки с журналом, бот заявок. Устройство движка — `engine/README.md`.
+
 | Что | Где |
 |---|---|
-| Домен, бренд, контакты, ниша для ИИ | `src/siteconf.py` (одна настройка; PHP получает её как `dist/_blog/site.php`) |
+| Домен, бренд, контакты, ниша | `src/siteconf.py` → настройки движка в `build.py` (`site_consts`) |
+| Тексты ниши для ИИ (кто пишет, для кого, стиль обложек, затравки, вопросы ИИ, подписи админки) | `site/prompts.php` |
 | Каталог: категории, товары, города | `src/catalog.py` |
 | Структура сайта для SEO | `docs/STRUCTURE.md` |
-| Шаблоны, schema.org, sitemap, robots, llms.txt | `build.py` |
-| Стили и скрипты | `static/assets/` |
-| Форма заявки → журнал + Telegram | `static/api/send.php`, журнал — `static/_blog/leads.php` |
-| Бот заявок (привязка группы по PIN) | `static/api/_tg.php`, `tg-hook.php` |
-| Блог, ИИ-автор, SEO-автопилот | `static/_blog/` (`lib.php`, `ai.php`, `seo.php`) |
-| Автопилот статей: свободный день в плане → тема, статья, обложка с людьми, в план | `static/_blog/autopost.php`, `static/api/autopost-tick.php`; включается в админке («📝 Статьи» → «🤖 Автопилот») |
-| Админка | https://metalbaza.kz/admin/ — `static/admin/`, `static/_blog/admin.tpl` |
-| Редиректы и закрытые адреса | `static/.htaccess` |
+| Шаблоны страниц, schema.org, sitemap, robots, llms.txt | `build.py` |
+| Стили, скрипты, редиректы | `static/assets/`, `static/.htaccess` |
+| Админка | https://metalbaza.kz/admin/ (из движка) |
 
 Страницы: главная, 5 категорий, 20 товаров, 5 городов, «Как это работает», «Поставщикам», контакты,
-политика конфиденциальности. Блог — `/blog/` (статьи пишутся в админке).
+политика конфиденциальности. Блог — `/blog/`. Статьи: «Новая статья» в админке ставит статью в очередь —
+текст и обложка (по умолчанию с людьми) готовятся одновременно на сервере, готовая встаёт на ближайший свободный
+день; галочками можно отправить сразу несколько тем; 🤖 Автопилот — сам, когда в плане на неделю есть место.
 
 ## Данные на хостинге
 
@@ -39,8 +41,8 @@ SEO-сайт заявок на металлопрокат: покупатель 
 
 ```
 python3 build.py                                                               # сборка в dist/ + SEO-аудит
-ALFIMOV_DATA=/tmp/mb-data php -S 127.0.0.1:8092 -t dist tools/dev_router.php   # сайт с PHP
-python3 -m pytest tests                                                        # тесты (и PHP, если есть php)
+ALFIMOV_DATA=/tmp/mb-data php -S 127.0.0.1:8092 -t dist engine/tools/dev_router.php   # сайт с PHP
+python3 -m pytest tests                                                        # тесты сайта и движка (PHP, если есть php)
 ```
 
 ## Деплой
@@ -55,5 +57,6 @@ https://metalbaza.kz/version.txt.
 
 ## Второй сайт на этом движке
 
-Скопировать репозиторий, заменить `src/siteconf.py` и `src/catalog.py`, тексты служебных страниц в `build.py`
-и цвета в `static/assets/style.css`. PHP-часть менять не нужно.
+Скопировать репозиторий (движок подтянется как submodule), заменить `src/siteconf.py`, `src/catalog.py`, `site/prompts.php`,
+тексты служебных страниц в `build.py` и цвета в `static/assets/style.css`. Движок не трогать — улучшения движка
+делаются в site-engine и подтягиваются во все сайты.

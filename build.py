@@ -17,7 +17,10 @@ from datetime import date
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent / "src"))
+sys.path.insert(0, str(Path(__file__).parent / "engine"))
 import catalog as cat  # noqa: E402
+import enginekit  # noqa: E402  (общий движок сайтов — git submodule engine/)
+import seo_audit  # noqa: E402  (из движка)
 import siteconf as cfg  # noqa: E402
 
 ROOT = Path(__file__).parent
@@ -773,34 +776,30 @@ def llms_txt():
     )
 
 
-def php_val(v):
-    if isinstance(v, int):
-        return str(v)
-    if isinstance(v, str):
-        return "'" + v.replace("\\", "\\\\").replace("'", "\\'") + "'"
-    if isinstance(v, (list, tuple)):
-        return "[" + ", ".join(php_val(x) for x in v) + "]"
-    raise TypeError(v)
+# Код первой настройки админки: сам код — только в SETUP-CODE.txt на компьютере владельца, здесь — его sha256.
+SETUP_CODE_SHA256 = "908187d200bded85829353397938f3ea5057a06fb129da178d94a6c08f31f091"
 
 
-def site_php():
-    """_blog/site.php — настройки сайта для PHP-движка (из src/siteconf.py)."""
+def site_consts():
+    """Настройки сайта для общего движка (engine/, enginekit.REQUIRED и DEFAULTS) — из src/siteconf.py."""
     n = cfg.NICHE
-    consts = {
+    return {
         "SITE_HOST": cfg.HOST, "SITE_URL": cfg.SITE_URL, "SITE_BRAND": cfg.BRAND, "SITE_BRAND_UPPER": cfg.BRAND_UPPER,
-        "SITE_DATA": cfg.DATA_DIR_NAME, "SITE_BOT": cfg.BOT_USERNAME, "SITE_TG_LABEL": cfg.TG_LABEL, "SITE_TG_HUB_UP": cfg.TG_HUB_UP, "SITE_PHONE": cfg.PHONE_DISPLAY,
+        "SITE_DATA": cfg.DATA_DIR_NAME, "SITE_INDEXNOW_KEY": INDEXNOW_KEY, "SITE_SETUP_SHA256": SETUP_CODE_SHA256,
+        "SITE_COOKIE": "mb_admin", "SITE_PHONE": cfg.PHONE_DISPLAY, "SITE_TG_LABEL": cfg.TG_LABEL, "SITE_TG_HUB_UP": cfg.TG_HUB_UP,
+        "SITE_LEAD_NAME": False, "SITE_LEAD_CONSENT": True,
+        # для текстов ниши (site/prompts.php)
         "NICHE_ABOUT": n["about"], "NICHE_READER": n["reader"], "NICHE_CTA": n["cta"], "NICHE_AUTHOR": n["author"],
-        "NICHE_SEEDS": n["seeds"], "NICHE_SEED_PATTERNS": n["patterns"], "SITE_INDEXNOW_KEY": INDEXNOW_KEY, "NICHE_GEO_QUESTIONS": n["geo_questions"],
+        "NICHE_SEEDS": n["seeds"], "NICHE_SEED_PATTERNS": n["patterns"], "NICHE_GEO_QUESTIONS": n["geo_questions"],
         "NICHE_BRAND_RE": n["brand_re"], "NICHE_IMAGE_STYLE": n["image_style"],
     }
-    lines = [f"if (!defined('{k}')) define('{k}', {php_val(v)});" for k, v in consts.items()]
-    return "<?php\n// Сгенерировано build.py из src/siteconf.py — не править руками.\n" + "\n".join(lines) + "\n"
 
 
 def build():
     if DIST.exists():
         shutil.rmtree(DIST)
-    shutil.copytree(STATIC, DIST)
+    enginekit.install(DIST)                              # общий движок: блог, ИИ, очередь статей, SEO, админка, заявки, бот
+    shutil.copytree(STATIC, DIST, dirs_exist_ok=True)    # файлы сайта поверх движка
 
     pages = [build_home(), *(build_category(c) for c in cat.CATEGORIES), *(build_product(p) for p in cat.PRODUCTS),
              *(build_city(c) for c in cat.CITIES), build_how(), build_suppliers(), build_contacts(), build_policy()]
@@ -810,10 +809,11 @@ def build():
         paths.append(p)
     write("/404.html", build_404())
 
-    (DIST / "_blog" / "site.php").write_text(site_php(), encoding="utf-8")
-    admin = DIST / "_blog" / "admin.tpl"
-    names = json.dumps({p["slug"]: p["name"] for p in cat.PRODUCTS}, ensure_ascii=False)
-    admin.write_text(admin.read_text(encoding="utf-8").replace("%%SERVICE_NAMES%%", names), encoding="utf-8")
+    enginekit.write_site_php(DIST, site_consts())
+    enginekit.write_prompts(DIST, ROOT / "site" / "prompts.php")
+    missing = enginekit.check_htaccess(DIST)
+    if missing:
+        raise SystemExit("В static/.htaccess нет правил движка: " + "; ".join(missing))
     (DIST / "_blog" / "parts.json").write_text(json.dumps(blog_parts(), ensure_ascii=False), encoding="utf-8")
     (DIST / "_blog" / "sitemap.tpl").write_text(sitemap(paths), encoding="utf-8")
     seed = ROOT / "content" / "articles"
@@ -827,7 +827,6 @@ def build():
     # Токен бота — только на хостинге в tg-config.php рядом с httpdocs; в сборке — пустая заглушка.
     (DIST / "api" / "config.php").write_text("<?php\nreturn ['tg_token' => '', 'tg_chat' => ''];\n", encoding="utf-8")
     print(f"Built {len(paths)} pages → {DIST}")
-    import seo_audit
     issues = seo_audit.audit(DIST)
     for i in issues:
         if i.severity != "info":

@@ -66,7 +66,7 @@ class BuildTest(unittest.TestCase):
         # Движок взят у alfimov.kz — в собранном сайте не должно остаться агентских адресов и текстов.
         for f in build.DIST.rglob("*"):
             # api/_tg.php и подсказка в админке — про общий с alfimov.kz бот (бот один на оба сайта)
-            if f.suffix in (".html", ".php", ".json", ".tpl", ".txt", ".js", ".css") and f.name not in ("_tg.php", "admin.tpl"):
+            if f.suffix in (".html", ".php", ".json", ".tpl", ".txt", ".js", ".css") and f.name not in ("_tg.php", "admin.tpl", "prompts.php", "prompts.example.php"):
                 t = f.read_text(encoding="utf-8")
                 self.assertNotIn("alfimov.kz", t, str(f))
                 self.assertNotIn("агентств", t.lower(), str(f))
@@ -81,9 +81,9 @@ class BuildTest(unittest.TestCase):
         for f in sorted((build.DIST).rglob("*.php")):
             r = subprocess.run(["php", "-l", str(f)], capture_output=True, text=True)
             self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
-        for t in ("test_blog.php", "test_tg.php", "test_seo.php", "test_leads.php", "test_autopost.php"):
-            r = subprocess.run(["php", str(ROOT / "tests" / "php" / t)], capture_output=True, text=True)
-            self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+        for t in build.enginekit.php_tests():   # тесты общего движка — на сборке этого сайта
+            r = subprocess.run(["php", str(t), str(ROOT)], capture_output=True, text=True)
+            self.assertEqual(r.returncode, 0, t.name + "\n" + r.stdout + r.stderr)
 
 
 if __name__ == "__main__":
