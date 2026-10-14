@@ -22,6 +22,29 @@ function save_settings(array $s): void
 /** Разделы сайта, на которые ведут статьи: товары каталога (slug, name, short, price). */
 function services(): array { return parts()['services']; }
 
+/**
+ * Тексты ниши (кто пишет, для кого, правила цен, стиль картинок, затравки поиска, вопросы ИИ) — у каждого сайта свои:
+ * _blog/prompts.php сайта (образец — prompts.example.php движка). {name} в тексте подставляется из $vars.
+ */
+function prompts(): array
+{
+    static $p = null;
+    if ($p === null) {
+        $file = is_file(__DIR__ . '/prompts.php') ? __DIR__ . '/prompts.php' : __DIR__ . '/prompts.example.php';
+        $p = require $file;
+    }
+    return $p;
+}
+
+function P(string $key, array $vars = [])
+{
+    $v = prompts()[$key] ?? '';
+    if (!is_string($v)) return $v;
+    $map = [];
+    foreach ($vars as $k => $x) $map['{' . $k . '}'] = (string) $x;
+    return strtr($v, $map);
+}
+
 // ---------------------------------------------------------------- Claude
 
 /**
@@ -111,41 +134,7 @@ const ARTICLE_SCHEMA = [
 function writer_system_prompt(): string
 {
     $services = implode("\n", array_map(fn($s) => "- {$s['name']} — /{$s['slug']}/ — {$s['short']}", services()));
-    $about = NICHE_ABOUT;
-    $reader = NICHE_READER;
-    $cta = NICHE_CTA;
-    return <<<TXT
-Ты — редактор блога сайта {$about}
-
-Страницы каталога на сайте (название — адрес — коротко):
-$services
-
-Ты пишешь SEO-статьи на русском языке. Читатель — $reader. Статья должна ранжироваться в Google и Яндексе
-по заданным запросам и при этом быть полезной: конкретика, размеры и марки, расчёты, типичные ошибки, чек-листы.
-Без воды и канцелярита.
-
-Требования к статье:
-- Первый абзац — прямой ответ на главный вопрос статьи в 2–3 предложениях, с конкретикой (цифры, размеры, «от … до …»).
-  Его должны мочь процитировать ИИ-ответы Google, ChatGPT и Алисы как готовый ответ, без контекста остальной статьи.
-- Структура: после ответа ещё 1–2 абзаца вступления без заголовка, затем 5–9 разделов `##`, внутри при необходимости `###`.
-- Каждый раздел `##` начинается с 1–2 предложений, которые сами по себе отвечают на вопрос заголовка; определения
-  давай в форме «X — это …». Сравнения и размеры — таблицей, шаги и расчёты — нумерованным списком.
-  Заголовки разделов содержательные и отвечают на вопросы из поиска. `#` (h1) в теле не используй.
-- Главный ключ — в title, seo_title, первом абзаце и хотя бы одном `##`; остальные ключи и их вариации
-  распредели естественно. Никакого переспама.
-- Технические данные (ГОСТ, марки стали, масса метра, размеры) — только общеизвестные справочные; массу считай
-  по формулам (сталь 7850 кг/м³) и показывай расчёт. Если не уверен в цифре — не пиши её.
-- Цены: сайт цен не назначает. Не называй конкретных цен за тонну или лист как факт; объясняй, из чего складывается
-  цена, и предлагай сравнить предложения поставщиков. Пример расчёта стоимости — только с условной ценой, явно помеченной как пример.
-- Контекст Казахстана: тенге, города, климат (снег, ветер, мороз, сейсмика), местные реалии стройки.
-- НЕ выдумывай поставщиков, заводы, отзывы, статистику с источником и «кейсы».
-- Внутренние ссылки: 2–4 уместные ссылки markdown на страницы каталога из списка выше (относительный путь, например
-  [арматура](/armatura/)). Внешние ссылки не нужны.
-- В конце — короткий раздел с выводом и мягким призывом: $cta (без агрессивной продажи).
-- FAQ: 4–6 вопросов, которые реально задают в поиске, ответы по 1–3 предложения, не повторяют текст дословно.
-- related: выбери до 3 slug из списка существующих статей, если они по теме; иначе пустой список.
-- slug: транслит латиницей по главному ключу, 3–6 слов через дефис, без стоп-слов.
-TXT;
+    return P('writer', ['services' => $services]);
 }
 
 function writer_user_prompt(string $topic, array $keywords, string $notes, int $words, array $existing): string
@@ -180,7 +169,7 @@ function write_article(string $topic, array $keywords, string $notes, int $words
         'max_tokens' => 32000,
         'thinking' => ['type' => 'adaptive'],
         'output_config' => ['effort' => 'high', 'format' => ['type' => 'json_schema', 'schema' => ARTICLE_SCHEMA]],
-        'system' => writer_system_prompt() . ($has_source ? "\n" . SOURCE_RULES : ''),
+        'system' => writer_system_prompt() . ($has_source ? "\n" . source_rules() : ''),
         'messages' => [['role' => 'user', 'content' => $content]],
     ], $post);
     $known = array_column($existing, 'slug');
@@ -195,17 +184,7 @@ function write_article(string $topic, array $keywords, string $notes, int $words
 
 // Свежий материал (новость, пост в Instagram) — повод для статьи «в повестке». Свой текст, а не пересказ:
 // поисковики не ранжируют копии, а чужой текст целиком брать нельзя.
-const SOURCE_RULES = <<<TXT
-Статья по источнику. Пользователь прислал материал (статью, пост, скриншоты) — это информационный повод.
-- Напиши СВОЮ статью для читателя сайта в Казахстане: что произошло, что это меняет для него, что делать
-  на практике. Повод — во вступлении и в одном из разделов, остальное — полезный разбор.
-- Не копируй текст источника и не пересказывай его абзац за абзацем; дословно — максимум одна короткая цитата в кавычках.
-- Факты, цифры, даты и имена бери только из источника и подавай со ссылкой на него («по данным …»).
-  Не додумывай подробности, которых в источнике нет. Если источник — мнение или реклама, так и скажи.
-- В тексте одна внешняя ссылка markdown на источник (если есть адрес): [название источника](адрес).
-- Тему и поисковые запросы выбери сам по содержанию, если пользователь их не задал: то, что ищут
-  в Казахстане по этой теме; главный запрос — в начале списка keywords.
-TXT;
+function source_rules(): string { return P('source_rules'); }
 
 function source_prompt(array $source): string
 {
@@ -344,23 +323,11 @@ function fetch_source(string $url): array
 
 // Визуальный язык сайта. Промпт из слоёв (подход agency-os): постоянные слои держат стиль и качество,
 // переменные (сюжет, приём съёмки) дают разнообразие. Цвета — ТОЛЬКО словами: hex-код модель печатает в кадре.
-const IMG_STYLE = NICHE_IMAGE_STYLE . ' Clean composition, natural colours, sharp detail, believable materials and light.';
-const IMG_BANS = 'No text, no letters, no numbers, no logos or app icons of any brands (no Instagram, Facebook, TikTok, '
-    . 'Google marks), no watermarks, no UI screenshots, no fake dashboards or charts. '
-    . 'Avoid clichés: no handshakes, no floating gradient blobs, no glowing neon, no glassmorphism, no 3D-render plastic look. '
-    . 'Commercial-grade finish, crisp composition, natural hands and faces, no extra limbs, no distortions.';
-const PEOPLE_RULE = 'PEOPLE: authentic Central Asian (Kazakh) builders, foremen, warehouse workers or homeowners in real '
-    . 'Kazakhstan settings, candid and mid-action, in proper work clothes and safety gear, not posing, not looking at the camera, '
-    . 'no stock smiles; the scene explains the idea, faces are secondary.';
-const NO_PEOPLE_RULE = 'NO PEOPLE: no humans, faces, hands or silhouettes — steel products, tools, buildings and materials only.';
-const PEOPLE_SCENES = [
-    'a foreman checking rebar cages on a foundation before concrete is poured',
-    'a warehouse worker measuring steel pipes in a metal stockyard',
-    'a homeowner and a builder choosing profiled sheets for a fence at a yard',
-    'workers unloading bundles of rebar from a flatbed truck with a crane',
-    'a welder assembling a steel frame for a canopy, sparks in the air',
-    'a buyer comparing two steel samples with a caliper at a supply depot',
-];
+function img_style(): string { return P('img_style'); }
+function img_bans(): string { return P('img_bans'); }
+function people_rule(): string { return P('people_rule'); }
+function no_people_rule(): string { return P('no_people_rule'); }
+function people_scenes(): array { return P('people_scenes'); }
 // Приёмы съёмки из словаря agency-os, отобраны под спокойный стиль сайта.
 const TECHNIQUES = [
     'shot perfectly top-down, objects and people arranged on a plane',
@@ -387,9 +354,9 @@ function image_prompt(string $kind, string $title, string $lead, string $idea, s
     else throw new AiError('Опишите картинку или сначала заполните заголовок статьи');
     $people ??= pick_people($mode);
     $scene = $people
-        ? 'Scene: ' . PEOPLE_SCENES[array_rand(PEOPLE_SCENES)] . ', connected to the idea above. ' . PEOPLE_RULE
-        : 'Scene: an abstract still life of objects and materials expressing the idea. ' . NO_PEOPLE_RULE;
-    return "$topic $scene Camera: " . TECHNIQUES[array_rand(TECHNIQUES)] . '. ' . image_frame($kind) . ' ' . IMG_STYLE . ' ' . IMG_BANS;
+        ? 'Scene: ' . people_scenes()[array_rand(people_scenes())] . ', connected to the idea above. ' . people_rule()
+        : 'Scene: an abstract still life of objects and materials expressing the idea. ' . no_people_rule();
+    return "$topic $scene Camera: " . TECHNIQUES[array_rand(TECHNIQUES)] . '. ' . image_frame($kind) . ' ' . img_style() . ' ' . img_bans();
 }
 
 function pick_people(string $mode): bool
@@ -425,18 +392,17 @@ function image_scene(string $kind, array $article, string $idea, bool $people, s
     if (!$ctx && trim($idea) === '') throw new AiError('Опишите картинку или сначала заполните заголовок статьи');
     $task = $kind === 'cover' ? 'обложку статьи блога' : 'иллюстрацию внутрь статьи';
     $prompt = implode("\n", [
-        'Ты арт-директор блога сайта ' . SITE_BRAND . " (" . SITE_HOST . ", Казахстан). Нужна $task.",
+        P('art_director', ['task' => $task]),
         $ctx ? "Статья:\n" . implode("\n", $ctx) : '',
         trim($idea) !== '' ? "Идея картинки от редактора (главное, опирайся на неё): " . trim($idea) : '',
         '',
         'Шаг 1. main_idea — основная мысль ' . (trim($idea) !== '' ? 'картинки (по идее редактора)' : 'статьи') . ': одно короткое предложение (до 20 слов), что читатель должен понять.',
         'Шаг 2. scene — одна конкретная сцена, которая с первого взгляда передаёт эту мысль: визуальная метафора или ситуация, '
         . 'конкретные предметы, место, свет и композиция. Без абстрактных слов вроде «успех» и «рост» — только то, что можно нарисовать.',
-        'Стиль: ' . NICHE_IMAGE_STYLE,
+        P('scene_rule'),
         'Приём съёмки (встрои в сцену): ' . $technique . '.',
-        $people ? 'Люди: ' . PEOPLE_RULE : 'Людей нет: ' . NO_PEOPLE_RULE,
-        'Нельзя: текст, буквы и цифры в кадре, логотипы и значки брендов, экраны с интерфейсом и графиками, '
-        . 'рукопожатия, неон, пластиковый 3D-рендер. Цвета называй словами, без кодов.',
+        $people ? 'Люди: ' . people_rule() : 'Людей нет: ' . no_people_rule(),
+        P('scene_bans'),
         'scene пиши по-английски, 60–110 слов, без вступлений.',
     ]);
     $data = claude_json([
@@ -492,7 +458,7 @@ function generate_image(string $kind, string $title, string $lead, string $idea,
     $meta = ['main_idea' => '', 'scene' => ''];
     try {
         $meta = image_scene($kind, ['title' => $title, 'lead' => $lead] + $context, $idea, $people, $technique, $post);
-        $prompt = $meta['scene'] . ' ' . image_frame($kind) . ' ' . IMG_STYLE . ' ' . IMG_BANS;
+        $prompt = $meta['scene'] . ' ' . image_frame($kind) . ' ' . img_style() . ' ' . img_bans();
     } catch (AiError $ex) {
         if (str_contains($ex->getMessage(), 'Опишите картинку')) throw $ex;
         error_log('image scene fallback: ' . $ex->getMessage());
@@ -516,8 +482,6 @@ function generate_image(string $kind, string $title, string $lead, string $idea,
 
 // ---------------------------------------------------------------- идеи тем
 
-const SEEDS = NICHE_SEEDS;
-const PATTERNS = NICHE_SEED_PATTERNS;
 // Ритм: дни недели (пн=1 … вс=7) для 1, 2 и 3 статей в неделю; выход в 10:00 Алматы.
 // Регулярность важнее объёма: владельцы бизнеса читают в будни утром.
 const SLOT_DAYS = [1 => [2], 2 => [2, 4], 3 => [1, 3, 5]];
@@ -543,8 +507,10 @@ const IDEAS_SCHEMA = [
 ];
 
 /** Подсказки Google (gl=kz) и Яндекса (регион Казахстан) параллельно → [запрос => ['google'=>1,'yandex'=>1]]. */
-function collect_queries(array $seeds = SEEDS, array $patterns = PATTERNS): array
+function collect_queries(?array $seeds = null, ?array $patterns = null): array
 {
+    $seeds ??= P('seeds');
+    $patterns ??= P('seed_patterns');
     $jobs = [];
     foreach ($seeds as $s) {
         foreach ($patterns as $p) {
@@ -591,8 +557,8 @@ function ideas_prompt(array $queries, array $existing, string $focus): string
     $lines = [];
     foreach ($queries as $q => $src) $lines[] = $q . (count($src) > 1 ? '  [Google+Яндекс]' : '');
     $parts = [
-        'Ты SEO-редактор блога сайта ' . NICHE_ABOUT . ' Читатель — ' . NICHE_READER . '.',
-        "Страницы каталога (slug — название):\n$services",
+        P('ideas_role'),
+        P('catalog_label') . ":\n$services",
         "Реальные запросы из поисковых подсказок Google и Яндекса по Казахстану (пометка [Google+Яндекс] — встречается в обоих, это более надёжный спрос):\n" . implode("\n", $lines),
     ];
     if ($existing) $parts[] = "Статьи, которые уже есть в блоге (заголовок — главный запрос). Не повторяй вопросы, на которые они уже отвечают:\n" . implode("\n", array_map(fn($t) => "- $t", $existing));
@@ -602,19 +568,7 @@ function ideas_prompt(array $queries, array $existing, string $focus): string
     if ($queued) $parts[] = "Темы, которые уже предложены и ждут в списке (не повторяй их):\n" . implode("\n", array_map(fn($t) => "- $t", array_slice($queued, 0, 60)));
     if ($rejected) $parts[] = "Темы, которые редактор отклонил (не предлагай их и похожие на них):\n" . implode("\n", array_map(fn($t) => "- $t", array_slice($rejected, 0, 60)));
     if ($focus !== '') $parts[] = "Пожелание редактора: $focus";
-    $parts[] = 'Предложи 8–10 тем статей. Правила: только темы, полезные читателю и ведущие к страницам каталога; '
-        . 'игнорируй нерелевантное (вакансии, металлолом и приём лома, игры, чужие бренды и компании); '
-        . 'главный запрос и запросы бери только из списка выше, ничего не выдумывай и не пиши частотность; '
-        . 'не делай двух статей под один и тот же главный запрос; '
-        . 'ОДНА ТЕМА — ОДИН ВОПРОС ЧИТАТЕЛЯ: если вопрос уже закрыт статьёй блога или темой из списка, не предлагай его '
-        . 'другими словами (например, «Как выбрать профнастил для забора», «Какой профлист лучше для забора» и '
-        . '«Профнастил на забор: что выбрать» — это один и тот же вопрос). Делай темы разного типа: сколько стоит и из чего цена, '
-        . 'расчёт количества и веса, как выбрать марку и размер, ошибки при покупке и монтаже, сравнение материалов, '
-        . 'чек-лист приёмки металла; не больше двух тем на одну страницу каталога за раз; предпочитай запросы с деньгами и выбором '
-        . '(«цена», «сколько стоит», «как выбрать», «вес», город), после которых естественно оставить заявку. '
-        . 'service — один slug из списка страниц каталога. '
-        . 'Отсортируй темы в порядке публикации: сначала с самым явным спросом и коммерческим интентом, '
-        . 'и чередуй товары — две статьи подряд про один товар не ставь.';
+    $parts[] = P('ideas_rules');
     return implode("\n\n", $parts);
 }
 
@@ -636,7 +590,7 @@ function propose_ideas(string $focus, ?callable $post = null, ?array $queries = 
     }, $data['ideas'] ?? []);
     $result = ['ideas' => $ideas, 'queries' => count($queries), 'focus' => $focus, 'created' => now()->format('Y-m-d H:i')];
     write_json(DATA_DIR . '/ideas.json', $result);
-    topics_add($ideas, 'по всему каталогу');
+    topics_add($ideas, P('all_label'));
     topics_dedupe($post);
     return $result;
 }
@@ -693,20 +647,13 @@ function tune_articles(array $queries, array $pages, ?callable $post = null, str
         . "\nОписание: " . ($a['description'] ?: '—') . "\nЗапросы: " . implode(', ', array_slice($a['keywords'], 0, 10))
         . "\nРазделы: " . implode(' / ', md_h2($a['body_md'])) . "\nFAQ: " . implode(' / ', array_column($a['faq'], 0)), $arts);
     $prompt = implode("\n\n", [
-        'Ты SEO-редактор блога сайта ' . NICHE_ABOUT . ' Задача — подтянуть УЖЕ ВЫШЕДШИЕ статьи под запросы, '
-        . 'по которым Google их уже показывает, чтобы они поднялись на первую страницу.',
+        P('tune_role'),
         "Статьи блога:\n" . implode("\n\n", $artLines),
         "Запросы из Google Search Console за последнее время (запрос | показы | средняя позиция):\n" . implode("\n", array_map($fmt, $queries)),
         $pages ? "Страницы (адрес | показы | позиция):\n" . implode("\n", array_map($fmt, array_slice($pages, 0, 60))) : '',
+        P('tune_prices', ['prices' => implode("\n", array_map(fn($s) => "- {$s['name']}: {$s['price']}", services()))]),
         $notes,
-        'Правила. Для каждой статьи, у которой есть запросы с позицией примерно 4–40 (рядом с первой страницей), предложи: '
-        . 'seo_title до 60 символов с точными словами самых частых запросов и «Казахстан», если его нет и запросы общие; '
-        . 'description 140–160 символов; add_keywords — запросы из выгрузки, которых нет в статье; '
-        . 'sections — 0–2 новых раздела под вопросы из запросов, на которые статья сейчас не отвечает (не повторяй существующие разделы); '
-        . 'faq — 0–3 вопроса из формулировок запросов, ответы 1–3 предложения. Пустые строки и списки — если менять не нужно. '
-        . 'Статьи без подходящих запросов не включай. Факты и цифры не выдумывай; конкретных цен за тонну или лист не называй — сайт цен не назначает. '
-        . 'Пиши для читателя: ' . NICHE_READER . ', без воды. '
-        . 'new_topics — 0–5 тем под запросы из выгрузки, которым НЕ подходит ни одна статья (не повторяй статьи).',
+        P('tune_rules'),
     ]);
     $data = claude_json([
         'max_tokens' => 24000,
@@ -785,7 +732,7 @@ function apply_tune(string $slug, array $ch): array
 
 // «Дать вектор»: владелец пишет нишу или идею («продвижение мебельного бизнеса»), мы смотрим, что люди
 // реально ищут вокруг неё в Google и Яндексе (Казахстан), и Claude предлагает темы под этот спрос.
-const NICHE_PATTERNS = ['%s', 'как %s', '%s алматы', '%s астана', '%s казахстан'];
+const TREND_PATTERNS = ['%s', 'как %s', '%s алматы', '%s астана', '%s казахстан'];
 
 const TRENDS_SCHEMA = [
     'type' => 'object',
@@ -806,10 +753,7 @@ function niche_seeds(string $vector, ?callable $post = null): array
         'output_config' => ['effort' => 'low', 'format' => ['type' => 'json_schema', 'schema' => [
             'type' => 'object', 'properties' => ['seeds' => ['type' => 'array', 'items' => ['type' => 'string']]],
             'required' => ['seeds'], 'additionalProperties' => false]]],
-        'messages' => [['role' => 'user', 'content' => "Направление для статей сайта " . SITE_HOST . " (Казахстан): «{$vector}».\n"
-            . 'Дай 6–10 коротких поисковых фраз (2–4 слова, по-русски, строчными), которые набирают в Google и Яндексе '
-            . 'покупатели металла и строители по этой теме: цена, как выбрать, размеры, вес, расчёт. '
-            . 'Без кавычек, городов и брендов — это затравки для поисковых подсказок.']],
+        'messages' => [['role' => 'user', 'content' => P('seeds_prompt', ['vector' => $vector])]],
     ], $post);
     $seeds = array_values(array_unique(array_filter(array_map(fn($x) => mb_strtolower(trim((string) $x)), $data['seeds'] ?? []))));
     return array_slice($seeds ?: [mb_strtolower(trim($vector))], 0, 10);
@@ -819,17 +763,12 @@ function niche_seeds(string $vector, ?callable $post = null): array
 function niche_trends(string $vector, ?callable $post = null, ?array $queries = null): array
 {
     $vector = trim($vector);
-    if (mb_strlen($vector) < 3) throw new AiError('Опишите направление, например: «забор из профнастила» или «фундамент частного дома»');
+    if (mb_strlen($vector) < 3) throw new AiError(P('vector_error'));
     $seeds = $queries === null ? niche_seeds($vector, $post) : [];
-    $queries ??= collect_queries($seeds, NICHE_PATTERNS);
+    $queries ??= collect_queries($seeds, TREND_PATTERNS);
     if (count($queries) < 5) throw new AiError('По этой теме почти нет поисковых подсказок — попробуйте сформулировать шире');
     $existing = array_map(fn($a) => $a['title'] . ($a['keywords'] ? ' — ' . $a['keywords'][0] : ''), load_all());
-    $prompt = ideas_prompt($queries, $existing, '') . "\n\n"
-        . "НАПРАВЛЕНИЕ ОТ ВЛАДЕЛЬЦА САЙТА: «{$vector}». Все темы — в этом направлении.\n"
-        . 'summary: 3–5 коротких пунктов, что именно люди ищут по этой теме (группы вопросов), опираясь только на запросы выше. '
-        . 'relevant: до 30 запросов из списка дословно, которые относятся к теме (без мусора вроде игр и чужих брендов). '
-        . 'Среди тем обязательно один подробный практический разбор с расчётом материала по шагам. '
-        . 'Поставщиков, заводы и «кейсы» не выдумывай: вместо «кейса» — разбор с примером расчёта, явно помеченным как пример.';
+    $prompt = ideas_prompt($queries, $existing, '') . "\n\n" . P('trends_direction', ['vector' => $vector]) . P('trends_tail');
     $data = claude_json([
         'max_tokens' => 16000,
         'thinking' => ['type' => 'adaptive'],
@@ -958,8 +897,7 @@ function topics_dedupe(?callable $post = null): int
                 "Ты редактор блога. Найди темы-дубли.\n\nСтатьи блога (заголовок — главный запрос):\n" . ($arts ? implode("\n", $arts) : '— нет') .
                 "\n\nТемы-кандидаты (номер. тема — главный запрос):\n" . implode("\n", $lines) .
                 "\n\nКандидат — дубль, если отвечает на тот же вопрос читателя, что статья блога или кандидат с МЕНЬШИМ номером, "
-                . "даже другими словами и с другим городом. Пример дублей: «Как выбрать профнастил для забора» и «Какой профлист лучше для забора». "
-                . "НЕ дубли — разные вопросы про один товар: цена, расчёт количества, вес, ошибки монтажа, сравнение материалов. В of — заголовок того, что он повторяет. Если дублей нет — пустой список."]],
+                . "даже другими словами и с другим городом. " . P('dup_rule') . "В of — заголовок того, что он повторяет. Если дублей нет — пустой список."]],
         ], $post);
     } catch (AiError $ex) {
         error_log('topics dedupe: ' . $ex->getMessage());

@@ -8,8 +8,8 @@
 declare(strict_types=1);
 require_once __DIR__ . '/ai.php';
 
-const SETUP_CODE_SHA256 = '908187d200bded85829353397938f3ea5057a06fb129da178d94a6c08f31f091';
-const SESSION_COOKIE = 'mb_admin';
+const SETUP_CODE_SHA256 = SITE_SETUP_SHA256;   // хэш кода первой настройки — в настройках сайта (site.php)
+const SESSION_COOKIE = SITE_COOKIE;
 const SESSION_DAYS = 30;
 const LOGIN_WINDOW = 900;      // 15 минут
 const LOGIN_MAX_FAILS = 5;     // с одного IP за окно

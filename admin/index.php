@@ -26,7 +26,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
 if (current_session() && is_configured()) {
     header('Content-Type: text/html; charset=utf-8');
-    readfile(dirname(__DIR__) . '/_blog/admin.tpl');
+    // подписи и примеры в интерфейсе — у каждого сайта свои (prompts.php → 'admin'), разделы — из сборки сайта
+    $names = [];
+    foreach (services() as $x) $names[$x['slug']] = $x['name'];
+    $vars = ['%%HOST%%' => SITE_HOST, '%%SERVICE_NAMES%%' => json_encode($names, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG)];
+    foreach ((array) P('admin') as $k => $v) $vars['%%A_' . strtoupper((string) $k) . '%%'] = htmlspecialchars((string) $v, ENT_QUOTES, 'UTF-8');
+    echo strtr((string) file_get_contents(dirname(__DIR__) . '/_blog/admin.tpl'), $vars);
     exit;
 }
 

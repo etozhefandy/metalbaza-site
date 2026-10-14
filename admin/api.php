@@ -8,7 +8,7 @@ declare(strict_types=1);
 require dirname(__DIR__) . '/_blog/auth.php';
 require_once dirname(__DIR__) . '/_blog/seo.php';
 require_once dirname(__DIR__) . '/_blog/leads.php';
-require_once dirname(__DIR__) . '/_blog/autopost.php';
+require_once dirname(__DIR__) . '/_blog/queue.php';
 
 header('X-Robots-Tag: noindex, nofollow');
 header('Cache-Control: no-store');
@@ -110,26 +110,6 @@ function execute(array $job): array
     throw new RuntimeException('Неизвестная задача');
 }
 
-/** Источник для статьи: ссылка (скачиваем здесь, в задаче) + вставленный текст + скриншоты. */
-function job_source(?array $in): ?array
-{
-    if (!$in) return null;
-    $src = ['url' => '', 'title' => '', 'text' => '', 'images' => []];
-    if (($in['url'] ?? '') !== '') {
-        try {
-            $src = fetch_source($in['url']);
-        } catch (AiError $ex) {
-            // ссылка не открылась, но есть текст или скриншоты — пишем по ним, адрес оставляем для ссылки
-            if (trim($in['text'] ?? '') === '' && empty($in['images'])) throw $ex;
-            $src['url'] = $in['url'];
-        }
-    }
-    if (trim($in['text'] ?? '') !== '') $src['text'] = trim(($src['text'] ? $src['text'] . "\n\n" : '') . $in['text']);
-    foreach ($in['images'] ?? [] as $f) {
-        if (is_file($f)) $src['images'][] = ['image/jpeg', base64_encode((string) file_get_contents($f))];
-    }
-    return $src;
-}
 
 /** Скриншот источника → jpeg до 1568 px (больше Claude всё равно уменьшит) во временной папке задач. */
 function store_source_image(string $raw): string
@@ -190,6 +170,34 @@ function job_view(?array $job): array
     return ['status' => $job['status'], 'result' => $job['result'] ?? null, 'error' => $job['error'] ?? null];
 }
 
+/** Вход «написать статью» из админки: тема, ключи, пожелания, объём, источник (ссылка, текст, скриншоты). */
+function generate_input(array $d): array
+{
+    $source = null;
+    $s_url = trim((string) ($d['source_url'] ?? ''));
+    $s_text = trim((string) ($d['source_text'] ?? ''));
+    $shots = array_slice(is_array($d['source_images'] ?? null) ? $d['source_images'] : [], 0, 6);
+    if ($s_url !== '' || $s_text !== '' || $shots) {
+        if ($s_url !== '' && !preg_match('#^https?://#i', $s_url)) fail('Ссылка должна начинаться с http:// или https://');
+        $files = [];
+        foreach ($shots as $b64) {
+            $raw = base64_decode((string) $b64, true);
+            if (!$raw || strlen($raw) > MAX_UPLOAD) fail('Скриншот пустой или больше 20 МБ');
+            $files[] = store_source_image($raw);
+        }
+        $source = ['url' => $s_url, 'text' => mb_substr($s_text, 0, 20000), 'images' => $files];
+    }
+    if (trim((string) ($d['topic'] ?? '')) === '' && !$source && empty($d['auto'])) fail('Впишите тему статьи или добавьте источник');
+    return [
+        'source' => $source,
+        'topic' => (string) ($d['topic'] ?? ''),
+        'topic_key' => (string) ($d['topic_key'] ?? ''),
+        'keywords' => is_array($d['keywords'] ?? null) ? $d['keywords'] : preg_split('/[\n,;]+/u', (string) ($d['keywords'] ?? ''), -1, PREG_SPLIT_NO_EMPTY),
+        'notes' => (string) ($d['notes'] ?? ''),
+        'words' => max(500, min(4000, (int) ($d['words'] ?? 1500) ?: 1500)),
+    ];
+}
+
 // ---------------------------------------------------------------- маршруты
 
 if (!is_configured() || !current_session()) fail('Нужно войти в админку', 401);
@@ -226,15 +234,39 @@ if ($method === 'GET' && preg_match('#^api/leads\.csv$#', $route)) {
 if (($_SERVER['HTTP_X_ADMIN'] ?? '') !== '1') fail('forbidden', 403);
 
 try {
-    if ($method === 'GET' && $route === 'api/autopost') reply(autopost_view());
-    if ($method === 'POST' && $route === 'api/autopost') {
+    // очередь написания: кнопка «Написать», галочки у тем, автопилот (см. _blog/queue.php)
+    if ($method === 'GET' && $route === 'api/queue') { queue_maybe_kick(); reply(queue_view()); }
+    if ($method === 'POST' && $route === 'api/queue') {
+        $item = queue_add(generate_input(body()) + ['origin' => 'manual']);
+        queue_fire_free();
+        reply(['item' => $item] + queue_view());
+    }
+    if ($method === 'POST' && $route === 'api/queue/topics') {
+        $want = array_map('strval', (array) (body()['ids'] ?? []));
+        $n = 0;
+        foreach (topics_load() as $t) {
+            if (!in_array($t['id'], $want, true)) continue;
+            queue_add(['topic' => $t['topic'], 'topic_key' => topic_key($t), 'origin' => 'bulk',
+                'keywords' => array_values(array_unique(array_filter([(string) $t['main_keyword'], ...array_map('strval', $t['keywords'] ?? [])])))]);
+            $n++;
+        }
+        if (!$n) fail('Отметьте темы галочками');
+        queue_fire_free();
+        reply(['added' => $n] + queue_view());
+    }
+    if ($method === 'POST' && preg_match('#^api/queue/([0-9a-f]{16})/cancel$#', $route, $m)) {
+        if (!queue_cancel($m[1])) fail('Эту статью уже не отменить');
+        reply(queue_view());
+    }
+    if ($method === 'POST' && $route === 'api/autopilot') {
         $d = body();
         $s = settings();
         if (array_key_exists('on', $d)) $s['autopost'] = (bool) $d['on'];
         if (isset($d['per_week']) && isset(SLOT_DAYS[(int) $d['per_week']])) $s['per_week'] = (int) $d['per_week'];
         if (isset($d['image_mode']) && in_array($d['image_mode'], IMG_MODES, true)) $s['image_mode'] = $d['image_mode'];
         save_settings($s);
-        reply(autopost_view());
+        if (!empty($d['on'])) { $q = queue_state(); $q['checked'] = 0; queue_save($q); queue_maybe_kick(); }
+        reply(queue_view());
     }
     if ($method === 'GET' && $route === 'api/leads') {
         $months = lead_months();
@@ -255,31 +287,7 @@ try {
         if (!delete_article($m[1])) fail('Статья не найдена', 404);
         reply(['ok' => true]);
     }
-    if ($method === 'POST' && $route === 'api/generate') {
-        $d = body();
-        $source = null;
-        $s_url = trim((string) ($d['source_url'] ?? ''));
-        $s_text = trim((string) ($d['source_text'] ?? ''));
-        $shots = array_slice(is_array($d['source_images'] ?? null) ? $d['source_images'] : [], 0, 6);
-        if ($s_url !== '' || $s_text !== '' || $shots) {
-            if ($s_url !== '' && !preg_match('#^https?://#i', $s_url)) fail('Ссылка должна начинаться с http:// или https://');
-            $files = [];
-            foreach ($shots as $b64) {
-                $raw = base64_decode((string) $b64, true);
-                if (!$raw || strlen($raw) > MAX_UPLOAD) fail('Скриншот пустой или больше 20 МБ');
-                $files[] = store_source_image($raw);
-            }
-            $source = ['url' => $s_url, 'text' => mb_substr($s_text, 0, 20000), 'images' => $files];
-        }
-        if (trim((string) ($d['topic'] ?? '')) === '' && !$source) fail('Впишите тему статьи или добавьте источник');
-        reply(new_job('generate', [
-            'source' => $source,
-            'topic' => (string) ($d['topic'] ?? ''),
-            'keywords' => preg_split('/[\n,;]+/u', (string) ($d['keywords'] ?? ''), -1, PREG_SPLIT_NO_EMPTY),
-            'notes' => (string) ($d['notes'] ?? ''),
-            'words' => max(500, min(4000, (int) ($d['words'] ?? 1500) ?: 1500)),
-        ]));
-    }
+    if ($method === 'POST' && $route === 'api/generate') reply(new_job('generate', generate_input(body())));
     if ($method === 'POST' && $route === 'api/image') {
         $d = body();
         reply(new_job('image', [

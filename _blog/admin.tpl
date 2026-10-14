@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Блог — админка</title>
+<title>Блог — админка %%HOST%%</title>
 <meta name="robots" content="noindex">
 <link rel="icon" href="/favicon.svg" type="image/svg+xml">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400&display=swap">
@@ -99,7 +99,7 @@ label.f.inline select { width: auto; }
 .tabs-top button { white-space: nowrap; }
 @media (max-width: 1250px) { .tabs-top #nav-count { display: none; } }
 body.view-edit .tabs-top, body.view-settings .tabs-top { visibility: hidden; }
-body.home-list #new-card, body.home-list #seo-card, body.home-new #list-card, body.home-new #seo-card, body.home-new #ap-card, body.home-seo #ap-card, body.home-leads #ap-card,
+body.home-list #new-card, body.home-list #seo-card, body.home-new #list-card, body.home-new #seo-card, body.home-seo #q-card, body.home-leads #q-card,
 body.home-seo #list-card, body.home-seo #new-card, body.home-seo #keys-warn { display: none; }
 #leads-card { display: none; }
 body.home-leads #leads-card { display: block; }
@@ -143,6 +143,13 @@ ol.steps { margin: 8px 0; padding-left: 20px; display: grid; gap: 6px; font-size
 .chips { display: flex; flex-wrap: wrap; gap: 6px; }
 .chips button { border: 1px solid var(--line); border-radius: 4px; padding: 3px 9px; font-size: 13px; background: #fff; cursor: pointer; }
 .chips button:hover { border-color: var(--blue); color: var(--blue); }
+.qlist { list-style: none; margin: 12px 0 0; padding: 0; display: grid; gap: 6px; }
+.qlist li { display: flex; gap: 12px; align-items: center; padding: 8px 12px; border: 1px solid var(--line); border-radius: var(--r); font-size: 14px; }
+.qlist li b { flex: 1; font-weight: 500; }
+.qlist .st { font-family: var(--mono); font-size: 12px; color: var(--muted); white-space: nowrap; }
+.qlist li.done .st { color: var(--ok); } .qlist li.error .st { color: var(--bad); }
+.idea .pick { margin: 4px 0 0; width: 18px; height: 18px; flex: none; }
+#t-bulk { display: flex; flex-wrap: wrap; gap: 6px 12px; align-items: center; margin: 0 0 10px; }
 .idea .acts { display: flex; flex-direction: column; gap: 6px; flex: none; }
 .idea .src { font-family: var(--mono); font-size: 11px; color: var(--muted); }
 @media (max-width: 700px) { .idea .acts { flex-direction: row; width: 100%; } .idea .acts .btn { flex: 1; justify-content: center; } }
@@ -223,7 +230,7 @@ body:not(.view-edit) .mbar { display: none !important; }
 </head>
 <body>
 <header class="top">
-  <h1>Блог <span id="now"></span></h1>
+  <h1>Блог %%HOST%% <span id="now"></span></h1>
   <nav class="tabs-top" id="home-nav">
     <button type="button" data-v="list">📝 Статьи <span id="nav-count"></span></button>
     <button type="button" data-v="new">✨ Новая статья</button>
@@ -265,7 +272,7 @@ body:not(.view-edit) .mbar { display: none !important; }
           <details class="more"><summary>Вставить текст вручную</summary>
             <textarea id="s-text" rows="4" style="margin-top:8px" placeholder="Текст поста или статьи, если ссылка не открывается"></textarea>
           </details>
-          <label class="f">Пожелания <span class="hint">— необязательно: акцент, для кого, какой товар показать</span>
+          <label class="f">Пожелания <span class="hint">— необязательно: акцент, для кого, %%A_WISH%%</span>
             <input type="text" id="s-notes" placeholder="Например: для владельцев салонов, показать, что делать после нового правила">
           </label>
           <div class="row"><span class="spacer"></span><button class="btn btn-p" id="b-src">Написать статью по источнику</button></div>
@@ -285,10 +292,10 @@ body:not(.view-edit) .mbar { display: none !important; }
         </div>
         <div id="mode-new">
         <div class="row" style="gap:8px">
-          <input type="text" id="t-vector" placeholder="Направление (необязательно): например, забор из профнастила" style="flex:1">
+          <input type="text" id="t-vector" placeholder="%%A_VECTOR_PH%%" style="flex:1">
           <button class="btn btn-p" id="b-trends">Найти темы</button>
         </div>
-        <p class="hint" style="margin:8px 0 0">Пусто — темы по всему каталогу. С нишей — что ищут именно по ней. Частотности нет: это подсказки поисковиков, то есть то, что люди набирают.</p>
+        <p class="hint" style="margin:8px 0 0">Пусто — темы %%A_ALL_HINT%%. С нишей — что ищут именно по ней. Частотности нет: это подсказки поисковиков, то есть то, что люди набирают.</p>
         <p class="ai-status" id="t-status" style="margin:8px 0 0"></p>
         <div id="t-result" class="hidden">
           <div class="t-cols" id="t-cols">
@@ -311,11 +318,11 @@ body:not(.view-edit) .mbar { display: none !important; }
       <div class="pane" data-pane="own">
         <div class="grid">
           <label class="f">Тема статьи
-            <input type="text" id="g-topic" placeholder="Сколько весит арматура 12 мм и сколько метров в тонне">
+            <input type="text" id="g-topic" placeholder="%%A_TOPIC_PH%%">
           </label>
           <div class="grid g2">
             <label class="f">Поисковые запросы <span class="hint">— необязательно; через запятую, первый — главный</span>
-              <textarea id="g-keys" rows="3" placeholder="вес арматуры 12, арматура 12 мм цена за тонну, сколько метров арматуры в тонне"></textarea>
+              <textarea id="g-keys" rows="3" placeholder="%%A_KEYS_PH%%"></textarea>
             </label>
             <label class="f">Пожелания <span class="hint">— аудитория, акценты, что обязательно упомянуть</span>
               <textarea id="g-notes" rows="3" placeholder="Для владельцев кофеен и салонов. Показать пример расчёта бюджета."></textarea>
@@ -326,7 +333,7 @@ body:not(.view-edit) .mbar { display: none !important; }
       </div>
 
       <div class="pane" data-pane="auto">
-        <p style="margin:0 0 12px">ИИ посмотрит, что ищут в Google и Яндексе по каталогу и что уже есть в блоге, выберет самую нужную тему и напишет статью — она откроется черновиком.</p>
+        <p style="margin:0 0 12px">ИИ посмотрит, что ищут в Google и Яндексе %%A_ALL_HINT%% и что уже есть в блоге, выберет самую нужную тему и напишет статью — она откроется черновиком.</p>
         <div class="row"><span class="hint" id="auto-note"></span><span class="spacer"></span><button class="btn btn-p" id="b-auto">Придумай тему и напиши</button></div>
       </div>
 
@@ -338,6 +345,17 @@ body:not(.view-edit) .mbar { display: none !important; }
       </div>
     </section>
 
+    <section class="card" id="q-card">
+      <div class="row" style="gap:10px;flex-wrap:wrap">
+        <h2 style="margin:0">🧾 Очередь написания <small id="q-count"></small></h2>
+        <span class="spacer"></span>
+        <label class="f inline" title="Сам пишет статьи с обложками, когда в плане на неделю есть свободный день"><input type="checkbox" id="ap-on"> 🤖 Автопилот</label>
+        <label class="f inline">Ритм<select id="ap-week"><option value="1">1 в неделю (вт)</option><option value="2">2 в неделю (вт, чт)</option><option value="3">3 в неделю (пн, ср, пт)</option></select></label>
+        <label class="f inline">Обложка<select id="ap-mode"><option value="people">с людьми</option><option value="auto">авто</option><option value="abstract">без людей</option></select></label>
+      </div>
+      <ul class="qlist" id="q-list"></ul>
+      <p class="hint" id="q-hint" style="margin:8px 0 0">Сюда попадает каждая статья, которую вы отправили писать: текст и обложка готовятся одновременно на сервере (страницу можно закрыть), затем статья сама встаёт на ближайший свободный день по ритму, 10:00. Автопилот делает то же сам, когда на неделе есть свободный день.</p>
+    </section>
     <section class="card" id="list-card">
       <div class="row" style="margin-bottom:14px">
         <h2 style="margin:0">Статьи</h2>
@@ -351,16 +369,6 @@ body:not(.view-edit) .mbar { display: none !important; }
         <button class="btn" id="b-new">+ Вручную, без ИИ</button>
       </div>
       <ul class="acards" id="list"></ul>
-    </section>
-    <section class="card" id="ap-card">
-      <div class="row" style="gap:10px;flex-wrap:wrap">
-        <h2 style="margin:0">🤖 Автопилот статей</h2>
-        <label class="f inline"><input type="checkbox" id="ap-on"> включён</label>
-        <label class="f inline">Ритм<select id="ap-week"><option value="1">1 в неделю (вт)</option><option value="2">2 в неделю (вт, чт)</option><option value="3">3 в неделю (пн, ср, пт)</option></select></label>
-        <label class="f inline">Обложка<select id="ap-mode"><option value="people">с людьми</option><option value="auto">авто (иногда с людьми)</option><option value="abstract">без людей</option></select></label>
-      </div>
-      <p class="hint" id="ap-status" style="margin:10px 0 0">…</p>
-      <p class="hint" style="margin:6px 0 0">Когда в плане на ближайшую неделю есть свободный день, сайт сам берёт тему из списка тем (пуст — подбирает по спросу Google и Яндекса), пишет статью, рисует обложку и ставит её на этот день, 10:00. Вам приходит сообщение в Telegram; до выхода статью можно поправить или снять с плана.</p>
     </section>
 
     <!-- SEO-автопилот: раз в неделю сам (без кнопок), отчёт приходит в Telegram -->
@@ -383,7 +391,7 @@ body:not(.view-edit) .mbar { display: none !important; }
       </div>
       <p class="hint" id="seo-status" style="margin:0 0 6px"></p>
       <p class="hint" style="margin:0 0 14px">Раз в неделю сайт сам: смотрит позиции в Google (Search Console), готовит правки статей, ставит ссылки между статьями,
-        спрашивает ChatGPT и Claude, советуют ли они сайт, — и присылает отчёт в Telegram с кнопкой «Применить правки».</p>
+        спрашивает ChatGPT и Claude, советуют ли они %%A_GEO_WHO%%, — и присылает отчёт в Telegram с кнопкой «Применить правки».</p>
       <div class="card warn-card hidden" id="seo-connect" style="margin-bottom:14px">
         <b>Подключите Search Console</b> — без неё не будет позиций, просадок и правок статей (проверка ИИ-ответов и ссылки работают и так).
         <a href="#" id="seo-connect-open">Как подключить →</a>
@@ -442,7 +450,7 @@ body:not(.view-edit) .mbar { display: none !important; }
         <button class="btn btn-p" id="tg-pin">Получить PIN в Telegram</button>
         <button class="btn hidden" id="tg-unlink">Отвязать группу</button>
       </div>
-      <p class="hint" style="margin:12px 0 0">Бот общий с alfimov.kz. Привязать группу для заявок с этого сайта: 1) нажмите «Получить PIN» — бот пришлёт его вам в личку (или в боте: «🔗 Привязать группу» → metalbaza.kz); 2) добавьте бота в группу; 3) отправьте в группе PIN. У каждого сайта своя группа — заявки на продвижение сюда не попадут. Заявки всегда приходят вам в личку, а с привязанной группой — ещё и туда.</p>
+      <p class="hint" style="margin:12px 0 0">%%A_BOT_HINT%%</p>
     </section>
     <section class="card">
       <h2>Пароль <small id="s-login"></small></h2>
@@ -540,9 +548,9 @@ body:not(.view-edit) .mbar { display: none !important; }
               <label class="f">SEO title (&lt;title&gt;) <span class="cnt" id="c-seo"></span><input type="text" id="f-seo_title" placeholder="пусто — возьмём заголовок"></label>
               <label class="f">Описание для поиска <span class="cnt" id="c-desc"></span><textarea id="f-description" rows="3"></textarea></label>
               <label class="f">Поисковые запросы<input type="text" id="f-keywords" placeholder="через запятую"></label>
-              <label class="f">Раздел<input type="text" id="f-category" list="cats" placeholder="Арматура, Кровля, Расчёты…"><datalist id="cats"></datalist></label>
+              <label class="f">Раздел<input type="text" id="f-category" list="cats" placeholder="%%A_CAT_PH%%"><datalist id="cats"></datalist></label>
               <div class="grid g2">
-                <label class="f">Автор<input type="text" id="f-author" placeholder="редакция"></label>
+                <label class="f">Автор<input type="text" id="f-author" placeholder="%%A_AUTHOR_PH%%"></label>
                 <label class="f">Минут чтения<input type="number" id="f-read_min" min="1" placeholder="авто"></label>
               </div>
             </div>
@@ -637,22 +645,64 @@ $("home-nav").onclick = e => {
   if (document.body.classList.contains("view-edit") || document.body.classList.contains("view-settings")) return;
   setHomeView(b.dataset.v); window.scrollTo(0, 0);
 };
-// ---------- автопилот статей
-const AP_STEP = {topic: "выбирает тему", write: "пишет статью", publish: "рисует обложку и ставит в план"};
-function renderAp(d) {
-  $("ap-on").checked = d.on; $("ap-week").value = String(d.per_week); $("ap-mode").value = d.image_mode;
-  const last = d.last ? (d.last.error ? `Последний раз (${esc(d.last.at)}) не получилось: ${esc(d.last.error)}`
-    : `Последняя: «${esc(d.last.title)}» — выйдет ${esc((d.last.publish_at || "").replace("T", " "))}`) : "";
-  $("ap-status").innerHTML = !d.ready ? "Нужны ключи Claude и OpenAI в «Настройках»."
-    : d.running ? `Сейчас ${AP_STEP[d.running] || d.running}${d.topic ? ": «" + esc(d.topic) + "»" : ""}…`
-    : !d.on ? "Выключен: статьи пишутся только вручную." + (last ? " " + last : "")
-    : (d.due ? "Есть свободный день — статья появится в ближайшие минуты после захода на сайт." : `План на неделю заполнен (в очереди ${d.queue}).`) + (last ? " " + last : "");
+// ---------- очередь написания (кнопка «Написать», галочки у тем, автопилот — _blog/queue.php)
+let qPoll = null, qMine = new Set(), qSeen = {};
+const Q_ICON = {todo: "…", busy: "⏳", done: "✓", error: "✗"};
+function qStatus(it) {
+  if (it.stage === "done") return "✓ в плане: " + fmtDate(it.publish_at);
+  if (it.stage === "error") return "✗ " + (it.error || "ошибка");
+  if (it.stage === "cancelled") return "отменена";
+  if (it.stage === "queued") return "в очереди";
+  if (it.stage === "finishing") return "ставлю в план…";
+  const t = it.tasks;
+  if (t.topic && t.topic.state !== "done") return "⏳ выбираю тему";
+  return `текст ${Q_ICON[t.text.state]} · обложка ${Q_ICON[t.cover.state]}`;
 }
-const apSave = body => api("/admin/api/autopost", {method: "POST", body: JSON.stringify(body)}).then(renderAp).catch(e => toast(e.message, true));
-$("ap-on").onchange = () => apSave({on: $("ap-on").checked});
-$("ap-week").onchange = () => { try { localStorage.setItem("per_week", $("ap-week").value); } catch (e) {} $("i-week").value = $("ap-week").value; apSave({per_week: +$("ap-week").value}); };
-$("ap-mode").onchange = () => apSave({image_mode: $("ap-mode").value});
-api("/admin/api/autopost").then(d => { renderAp(d); try { if (!localStorage.getItem("per_week")) $("i-week").value = String(d.per_week); } catch (e) {} }).catch(() => {});
+function renderQueue(d) {
+  $("ap-on").checked = d.autopilot; $("ap-week").value = String(d.per_week); $("ap-mode").value = d.image_mode;
+  $("q-count").textContent = d.pending ? `· пишется ${d.pending}` : "";
+  const items = d.items.filter(it => it.stage !== "cancelled").slice(0, 8);
+  $("q-list").innerHTML = items.map(it => `<li class="${it.stage}"><b>${esc(it.title || it.topic || (it.origin === "auto" ? "Автопилот подбирает тему" : "Статья по источнику"))}</b>
+    <span class="st">${esc(qStatus(it))}</span>${it.origin !== "manual" ? `<span class="hint">${it.origin === "auto" ? "🤖" : "☑︎"}</span>` : ""}
+    ${it.stage === "done" ? `<button class="btn" data-qopen="${esc(it.slug)}">Открыть</button>` : ""}
+    ${it.stage === "queued" ? `<button class="btn" data-qcancel="${it.id}">Отменить</button>` : ""}</li>`).join("");
+  $("q-list").classList.toggle("hidden", !items.length);
+  if (!d.ready) $("q-hint").textContent = "Чтобы писать статьи, вставьте ключи Claude и OpenAI в «Настройках».";
+  // только что готовые — в список статей и уведомление
+  let fresh = false;
+  for (const it of d.items) {
+    if (qSeen[it.id] && qSeen[it.id] !== "done" && it.stage === "done") {
+      fresh = true;
+      if (qMine.has(it.id)) toast(`Готово: «${it.title}» — в плане на ${fmtDate(it.publish_at)}. Можно открыть и поправить.`);
+    }
+    qSeen[it.id] = it.stage;
+  }
+  if (fresh) { load(undefined).catch(() => {}); loadTopics(); }
+  clearTimeout(qPoll);
+  if (d.pending) qPoll = setTimeout(loadQueue, 4000);
+}
+const loadQueue = () => api("/admin/api/queue").then(renderQueue).catch(() => { clearTimeout(qPoll); qPoll = setTimeout(loadQueue, 10000); });
+async function enqueue(body, btn) {
+  busy(btn, true, "Ставлю в очередь…");
+  try {
+    const d = await api("/admin/api/queue", {method: "POST", body: JSON.stringify({words: $("g-words").value, ...body})});
+    qMine.add(d.item.id); qSeen[d.item.id] = d.item.stage; renderQueue(d);
+    toast("Статья в очереди: текст и обложка уже готовятся. Когда будет готова — встанет на ближайший свободный день.");
+    document.getElementById("q-card").scrollIntoView({behavior: "smooth", block: "start"});
+    return true;
+  } catch (e) { toast(e.message, true); return false; }
+  finally { busy(btn, false); }
+}
+$("q-list").onclick = async e => {
+  const o = e.target.closest("[data-qopen]"), c = e.target.closest("[data-qcancel]");
+  if (o) { await load(o.dataset.qopen); return; }
+  if (c) { try { renderQueue(await api(`/admin/api/queue/${c.dataset.qcancel}/cancel`, {method: "POST"})); } catch (err) { toast(err.message, true); } }
+};
+const apSave = body => api("/admin/api/autopilot", {method: "POST", body: JSON.stringify(body)}).then(renderQueue).catch(e => toast(e.message, true));
+$("ap-on").onchange = () => { apSave({on: $("ap-on").checked}); toast($("ap-on").checked ? "Автопилот включён: когда в плане на неделю есть свободный день, он сам напишет статью с обложкой" : "Автопилот выключен"); };
+$("ap-week").onchange = () => { try { localStorage.setItem("per_week", $("ap-week").value); } catch (e) {} $("i-week").value = $("ap-week").value; apSave({per_week: +$("ap-week").value}); loadTopics(); };
+$("ap-mode").onchange = () => { $("img-mode").value = $("ap-mode").value; apSave({image_mode: $("ap-mode").value}); };
+loadQueue();
 // ---------- журнал заявок
 async function loadLeads(month) {
   const d = await api("/admin/api/leads" + (month ? "?m=" + encodeURIComponent(month) : ""));
@@ -821,7 +871,7 @@ async function onSave(b) {
     const a = await save();
     loadTopics();  // тема с ключом этой статьи переходит в «Написаны»
     toast(a.state === "scheduled" ? `Сохранено · выйдет сама ${fmtDate(a.publish_at)}`
-      : a.state === "live" ? `Сохранено · на сайте: ${location.host}${a.path}` : "Сохранено · черновик, на сайте не виден");
+      : a.state === "live" ? `Сохранено · на сайте: %%HOST%%${a.path}` : "Сохранено · черновик, на сайте не виден");
   } catch (e) { toast(e.message, true); }
   busy(b, false);
 }
@@ -838,7 +888,7 @@ async function onNow(b) {
     if (!isLive) { $("f-status").value = "scheduled"; $("f-publish_at").value = almatyNow(); }
     dirty = true;
     const a = await save();
-    toast(`Опубликовано: ${location.host}${a.path}`);
+    toast(`Опубликовано: %%HOST%%${a.path}`);
   } catch (e) { toast(e.message, true); }
   busy(b, false);
 }
@@ -859,28 +909,8 @@ $("b-del").onclick = async () => {
   catch (e) { toast(e.message, true); }
 };
 // ИИ всегда пишет НОВУЮ статью: сохранённую (тем более опубликованную) он не перезаписывает.
-async function generate(body, btn, label, date) {
-  if (current || dirty) {
-    if (dirty && !confirm(current ? `В редакторе открыта статья «${current.title}» с несохранёнными правками. Они пропадут, а ИИ напишет новую статью. Продолжить?`
-      : "В редакторе есть несохранённая статья. Она пропадёт, а ИИ напишет новую. Продолжить?")) return false;
-    delete $("f-slug").dataset.touched; showHome();
-  }
-  const st = $("g-status");
-  busy(btn, true, label);
-  const t0 = Date.now(), tick = setInterval(() => { st.textContent = `Claude пишет статью… ${Math.round((Date.now() - t0) / 1000)} с (обычно 1–3 мин)`; }, 1000);
-  try {
-    const d = await runJob("/admin/api/generate", {words: $("g-words").value, ...body});
-    open(null);
-    fill(d.article);
-    showEditor();
-    if (date) {
-      $("f-status").value = "scheduled"; $("f-publish_at").value = date; refresh();
-      toast(`Готово — новая статья, дата выхода ${fmtDate(date)}. Проверьте текст и нажмите «Сохранить» — выйдет сама.`);
-    } else toast("Готово — это новая статья. Проверьте текст и нажмите «Сохранить»: она сохранится черновиком.");
-    return true;
-  } catch (e) { toast(e.message, true); return false; }
-  finally { clearInterval(tick); st.textContent = ""; busy(btn, false); }
-}
+// «Написать»: статья уходит в очередь — текст и обложка готовятся на сервере, дата выхода — ближайший свободный день.
+async function generate(body, btn) { return enqueue(body, btn); }
 // ---------- вкладки «откуда тема»
 function showTab(t) {
   [...$("src-tabs").children].forEach(b => b.classList.toggle("on", b.dataset.tab === t));
@@ -893,7 +923,7 @@ showTab((() => { try { return localStorage.getItem("src_tab"); } catch (e) {} })
 $("b-gen").onclick = () => {
   const topic = $("g-topic").value.trim();
   if (!topic) { toast("Впишите тему статьи", true); $("g-topic").focus(); return; }
-  generate({topic, keywords: $("g-keys").value, notes: $("g-notes").value}, $("b-gen"), "Пишу…")
+  generate({topic, keywords: $("g-keys").value, notes: $("g-notes").value}, $("b-gen"))
     .then(ok => { if (ok) { $("g-topic").value = ""; $("g-keys").value = ""; $("g-notes").value = ""; } });
 };
 // ---------- из поста или ссылки
@@ -916,7 +946,7 @@ $("b-src").onclick = async () => {
   const url = $("s-url").value.trim(), text = $("s-text").value.trim();
   if (!url && !text && !srcShots.length) { toast("Вставьте ссылку, текст или скриншоты", true); $("s-url").focus(); return; }
   if (url && !/^https?:\/\//i.test(url)) { toast("Ссылка должна начинаться с https://", true); return; }
-  const ok = await generate({source_url: url, source_text: text, source_images: srcShots, notes: $("s-notes").value}, $("b-src"), "Читаю источник…");
+  const ok = await generate({source_url: url, source_text: text, source_images: srcShots, notes: $("s-notes").value}, $("b-src"));
   if (ok) { $("s-url").value = ""; $("s-text").value = ""; $("s-notes").value = ""; srcShots = []; renderShots(); }
 };
 $("f-file").onchange = async e => {
@@ -954,7 +984,7 @@ $("b-inline-img").onclick = async () => {
   ta.value = ta.value.slice(0, pos) + md + ta.value.slice(pos);
   dirty = true; refresh(); toast("Иллюстрация вставлена в текст");
 };
-const SERVICE_NAMES = {"armatura": "Арматура", "ugolok": "Уголок металлический", "shveller": "Швеллер", "balka": "Балка двутавровая", "krug": "Круг стальной", "kvadrat": "Квадрат стальной", "polosa": "Полоса стальная", "katanka": "Катанка", "truba-profilnaya": "Труба профильная", "truba-vgp": "Труба ВГП", "truba-elektrosvarnaya": "Труба электросварная", "list-goryachekatanyj": "Лист горячекатаный", "list-holodnokatanyj": "Лист холоднокатаный", "list-ocinkovannyj": "Лист оцинкованный", "list-riflenyj": "Лист рифлёный", "list-pvl": "Лист просечно-вытяжной (ПВЛ)", "profnastil": "Профнастил", "metallocherepica": "Металлочерепица", "setka-kladochnaya": "Сетка кладочная", "provoloka-vyazalnaya": "Проволока вязальная"};  // build.py: slug → название товара
+const SERVICE_NAMES = %%SERVICE_NAMES%%;  // slug → название раздела сайта (подставляет admin/index.php)
 // ---------- темы: общий список всех тем, что предлагал ИИ (написать / отклонить / вернуть)
 let topics = [], topicFilter = "new";
 const topicState = t => t.used ? "used" : (t.status === "rejected" ? "rejected" : "new");
@@ -970,7 +1000,8 @@ function renderTopics() {
     const acts = st === "new" ? `<button class="btn btn-p" data-write="${t.id}">Написать статью</button><button class="btn" data-reject="${t.id}">Отклонить</button>`
       : st === "rejected" ? `<button class="btn" data-restore="${t.id}">Вернуть</button>` : "";
     return `<li class="idea${st !== "new" ? " used" : ""}">
-    <div><b>${esc(t.topic)}</b>
+    ${st === "new" ? `<input type="checkbox" class="pick" data-pick="${t.id}"${picked.has(t.id) ? " checked" : ""} title="Отметить для «Написать выбранные»">` : ""}
+    <div style="flex:1"><b>${esc(t.topic)}</b>
       ${st === "used" ? '<div class="hint">✓ по этой теме уже есть статья</div>' : st === "rejected" ? '<div class="hint">' + (t.reason ? "отклонена автоматически: " + esc(t.reason) : "отклонена") + '</div>' : ""}
       <div class="hint">🔑 ${esc(t.main_keyword)} · ${esc(t.intent)}${t.service ? " · → " + esc(SERVICE_NAMES[t.service] || t.service) : ""}</div>
       <div class="hint">${esc(t.why)}</div>
@@ -978,7 +1009,34 @@ function renderTopics() {
       <div class="src">${esc(t.source || "")} · ${esc(t.created || "")}</div></div>
     <div class="acts">${acts}</div></li>`;
   }).join("") : `<li class="empty">${topicFilter === "new" ? "Новых тем нет — нажмите «Найти темы»." : "Пусто."}</li>`;
+  renderBulk();
 }
+// несколько статей сразу: отметить темы галочками → «Написать выбранные»
+const picked = new Set();
+function renderBulk() {
+  let bar = $("t-bulk");
+  if (!bar) { bar = document.createElement("div"); bar.id = "t-bulk"; $("t-ideas").before(bar); }
+  const n = [...picked].filter(id => topics.some(t => t.id === id && topicState(t) === "new")).length;
+  bar.classList.toggle("hidden", topicFilter !== "new" || !topics.some(t => topicState(t) === "new"));
+  bar.innerHTML = `<button class="btn btn-p" id="t-bulk-go"${n ? "" : " disabled"}>Написать выбранные${n ? " (" + n + ")" : ""}</button>
+    <a href="#" class="hint" id="t-bulk-all">отметить все</a><span class="hint">— каждая встанет на свой свободный день, с обложкой</span>`;
+}
+document.addEventListener("change", e => {
+  const c = e.target.closest("[data-pick]"); if (!c) return;
+  c.checked ? picked.add(c.dataset.pick) : picked.delete(c.dataset.pick); renderBulk();
+});
+document.addEventListener("click", async e => {
+  if (e.target.id === "t-bulk-all") { e.preventDefault(); topics.filter(t => topicState(t) === "new").forEach(t => picked.add(t.id)); renderTopics(); return; }
+  if (e.target.id !== "t-bulk-go") return;
+  const b = e.target; busy(b, true, "Ставлю в очередь…");
+  try {
+    const d = await api("/admin/api/queue/topics", {method: "POST", body: JSON.stringify({ids: [...picked]})});
+    d.items.slice(0, d.added).forEach(it => { qMine.add(it.id); qSeen[it.id] = it.stage; });
+    picked.clear(); renderQueue(d); renderTopics();
+    toast(`В очереди статей: ${d.added}. Пишутся по очереди на сервере, страницу можно закрыть.`);
+    document.getElementById("q-card").scrollIntoView({behavior: "smooth", block: "start"});
+  } catch (err) { toast(err.message, true); busy(b, false); }
+});
 const week = () => $("i-week").value;
 const loadTopics = () => api("/admin/api/topics?per_week=" + week()).then(d => { topics = d.topics || []; renderTopics(); }).catch(() => {});
 $("t-dedupe").onclick = async e => {
@@ -994,7 +1052,7 @@ $("t-ideas").onclick = async e => {
   const w = e.target.closest("[data-write]"), r = e.target.closest("[data-reject]"), back = e.target.closest("[data-restore]");
   const id = (w || r || back || {}).dataset?.write || (r && r.dataset.reject) || (back && back.dataset.restore);
   const t = topics.find(x => x.id === id); if (!t) return;
-  if (w) { if (await generate({topic: t.topic, keywords: kw(t)}, w, "Пишу…")) loadTopics(); return; }
+  if (w) { if (await generate({topic: t.topic, keywords: kw(t), topic_key: (t.main_keyword || "").toLowerCase().trim() + "|" + t.topic.toLowerCase().trim()}, w)) loadTopics(); return; }
   try { await api("/admin/api/topics/" + t.id, {method: "POST", body: JSON.stringify({status: r ? "rejected" : "new"})});
     t.status = r ? "rejected" : "new"; renderTopics(); toast(r ? "Тема отклонена — ИИ не будет её предлагать" : "Тема вернулась в новые"); }
   catch (err) { toast(err.message, true); }
@@ -1010,13 +1068,13 @@ function renderDemand(d, label) {
     $("t-summary").innerHTML = (d.summary || []).map(x => `<li>${esc(x)}</li>`).join("");
     $("t-queries").innerHTML = (d.top_queries || []).map(q => `<button type="button" class="${q.both ? "both" : ""}" data-q="${esc(q.q)}">${esc(q.q)}</button>`).join("");
   }
-  $("t-status").textContent = (niche ? `«${d.vector}» · ` : "По всему каталогу · ") + `${d.queries} реальных запросов · ${d.created}`;
+  $("t-status").textContent = (niche ? `«${d.vector}» · ` : "%%A_ALL_LABEL%% · ") + `${d.queries} реальных запросов · ${d.created}`;
 }
 $("t-queries").onclick = e => {
   const b = e.target.closest("[data-q]"); if (!b) return;
   const q = b.dataset.q;
   if (!confirm(`Написать статью по запросу «${q}»? ИИ сам подберёт заголовок.`)) return;
-  generate({topic: q, keywords: q}, b, "…");
+  generate({topic: q, keywords: q}, b);
 };
 async function findTopics(vector) {
   const b = $("b-trends"); busy(b, true, "Ищу…");
@@ -1138,20 +1196,8 @@ $("seo-apply-all").onclick = async () => {
 api("/admin/api/tune").then(d => { if (d && d.created) renderTune(d); }).catch(() => {});
 // ---------- придумай сам: первая новая тема из списка (нет — ищем по всему каталогу) → сразу пишем
 $("b-auto").onclick = async () => {
-  const b = $("b-auto");
-  await loadTopics();
-  let t = topics.find(x => topicState(x) === "new");
-  if (!t) {
-    busy(b, true, "Выбираю тему…");
-    $("auto-note").textContent = "Смотрю спрос в Google и Яндексе… обычно до минуты";
-    try { renderDemand(await runJob("/admin/api/ideas?per_week=" + week(), {focus: ""})); await loadTopics(); }
-    catch (e) { busy(b, false); $("auto-note").textContent = ""; toast(e.message, true); return; }
-    busy(b, false);
-    t = topics.find(x => topicState(x) === "new");
-  }
-  if (!t) { $("auto-note").textContent = ""; toast("Свободных тем не нашлось — попробуйте «Из запросов» с нишей", true); return; }
-  $("auto-note").textContent = "Тема: " + t.topic;
-  if (await generate({topic: t.topic, keywords: kw(t)}, b, "Пишу…")) loadTopics();
+  $("auto-note").textContent = "Тему выберет сервер: первая новая из списка, а если список пуст — по спросу Google и Яндекса.";
+  if (await generate({auto: true}, $("b-auto"))) loadTopics();
 };
 try { $("i-week").value = localStorage.getItem("per_week") || "2"; } catch (e) {}
 $("i-week").onchange = () => { try { localStorage.setItem("per_week", week()); } catch (e) {} loadTopics(); $("ap-week").value = week(); apSave({per_week: +week()}); };
@@ -1215,7 +1261,7 @@ function renderSeo() {
   if (r && r.geo && r.geo.length) {
     const byPrompt = {};
     r.geo.forEach(g => (byPrompt[g.prompt] = byPrompt[g.prompt] || []).push(g));
-    out.push(`<div class="seo-sec"><h3>🤖 ИИ-ответы <span class="hint">· сайт упомянули в ${r.geo_hits} из ${r.geo.length} ответов</span></h3><ul class="seo-list">` +
+    out.push(`<div class="seo-sec"><h3>🤖 ИИ-ответы <span class="hint">· %%A_GEO_WHO%% упомянули в ${r.geo_hits} из ${r.geo.length} ответов</span></h3><ul class="seo-list">` +
       Object.entries(byPrompt).map(([q, gs]) => `<li>${esc(q)}<div class="row" style="gap:6px;margin-top:6px">` +
         gs.map(g => `<span class="geo-row"><span class="tag${g.mentioned || g.cited ? " hit" : ""}">${g.engine === "claude" ? "Claude" : "ChatGPT"}: ${g.cited ? "ссылается на сайт" : g.mentioned ? "упоминает" : "нет"}</span></span>`).join("") +
         `</div>${gs.filter(g => g.excerpt).map(g => `<q>${esc(g.excerpt)}</q>`).join("")}</li>`).join("") + `</ul>` +

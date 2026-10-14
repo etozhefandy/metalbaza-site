@@ -21,8 +21,7 @@ const LINKS_PER_STEP = 3;         // статей на один шаг пере�
 const LINKS_MAX = 3;              // автоссылок в одной статье
 const GEO_CLAUDE_MODEL = 'claude-sonnet-5-5';
 const GEO_OPENAI_MODELS = ['gpt-5', 'gpt-4.1'];   // первая недоступна — пробуем следующую
-const BRAND_RE = NICHE_BRAND_RE;
-const GEO_PROMPTS = NICHE_GEO_QUESTIONS;
+
 
 function local_time(int $ts, string $fmt): string { return (new DateTimeImmutable('@' . $ts))->setTimezone(tz())->format($fmt); }
 
@@ -49,7 +48,7 @@ function seo_settings(): array
 {
     $s = settings();
     $prompts = array_values(array_filter(array_map('trim', (array) ($s['geo_prompts'] ?? [])), 'strlen'));
-    return ['auto_apply' => !empty($s['seo_auto_apply']), 'geo_prompts' => $prompts ?: GEO_PROMPTS, 'geo_custom' => (bool) $prompts];
+    return ['auto_apply' => !empty($s['seo_auto_apply']), 'geo_prompts' => $prompts ?: P('geo_questions'), 'geo_custom' => (bool) $prompts];
 }
 
 /** HTTP для Google и OpenAI → [код, json]. $http — подмена в тестах: fn(method, url, headers, body): [код, сырой ответ]. */
@@ -326,7 +325,7 @@ function make_links(array $slugs, ?callable $post = null): int
         'max_tokens' => 4000,
         'output_config' => ['effort' => 'low', 'format' => ['type' => 'json_schema', 'schema' => LINKS_SCHEMA]],
         'messages' => [['role' => 'user', 'content' => implode("\n\n", [
-            'Ты SEO-редактор блога ' . SITE_BRAND_UPPER . '. Расставь внутренние ссылки между статьями блога.',
+            P('links_role'),
             "Все статьи блога (slug: заголовок):\n$catalog",
             "Статьи, в которые ставим ссылки (from):\n$texts",
             'Для каждой статьи from выбери 1–' . LINKS_MAX . ' другие статьи из списка, на которые читателю действительно полезно перейти, '
@@ -414,7 +413,7 @@ function geo_result(string $engine, string $prompt, string $text, array $urls): 
 {
     $hosts = array_values(array_unique(array_filter(array_map('host_of', $urls))));
     $excerpt = '';
-    if (preg_match(BRAND_RE, $text, $m, PREG_OFFSET_CAPTURE)) {
+    if (preg_match(P('brand_re'), $text, $m, PREG_OFFSET_CAPTURE)) {
         $start = max(0, $m[0][1] - 120);
         $excerpt = '…' . trim(mb_strcut($text, $start, 320)) . '…';
     }
@@ -704,7 +703,7 @@ function seo_report(array $run, ?callable $tg = null): array
             $per[$g['engine']][1] = ($per[$g['engine']][1] ?? 0) + 1;
         }
         $parts = implode(', ', array_map(fn($k, $v) => (ENGINE_NAMES[$k] ?? $k) . " {$v[0]}/{$v[1]}", array_keys($per), $per));
-        $lines[] = "\n🤖 <b>ИИ-ответы</b>: сайт упомянули в $hits из " . count($geo) . " ($parts)"
+        $lines[] = "\n🤖 <b>ИИ-ответы</b>: " . P('geo_who') . " упомянули в $hits из " . count($geo) . " ($parts)"
             . ($prevGeo && isset($prevGeo['geo_total']) && $prevGeo['geo_total'] ? ", в прошлый раз {$prevGeo['geo_hits']} из {$prevGeo['geo_total']}" : '');
         if ($sites) $lines[] = 'Чаще ссылаются на: ' . $e(implode(', ', array_slice(array_keys($sites), 0, 5)));
     }
