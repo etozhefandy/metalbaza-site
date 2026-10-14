@@ -339,6 +339,7 @@ body:not(.view-edit) .mbar { display: none !important; }
 
       <div class="row new-foot">
         <label class="f inline">Объём<select id="g-words"><option value="1000">~1000 слов</option><option value="1500" selected>~1500 слов</option><option value="2000">~2000 слов</option><option value="2500">~2500 слов</option></select></label>
+        <label class="f inline">Модель<select id="g-model" title="Кто пишет статьи, поставленные отсюда; по умолчанию — из «Настроек»"></select></label>
         <label class="f inline">Ритм<select id="i-week"><option value="1">1 в неделю (вт)</option><option value="2" selected>2 в неделю (вт, чт)</option><option value="3">3 в неделю (пн, ср, пт)</option></select></label>
         <span class="spacer"></span>
         <span class="ai-status" id="g-status"></span>
@@ -440,7 +441,12 @@ body:not(.view-edit) .mbar { display: none !important; }
           <input type="password" id="s-ant" placeholder="sk-ant-…" autocomplete="off" spellcheck="false"></label>
         <label class="f">Ключ OpenAI (картинки) <span class="hint" id="s-oai-cur"></span>
           <input type="password" id="s-oai" placeholder="sk-…" autocomplete="off" spellcheck="false"></label>
-        <p class="hint">Пустое поле — ключ не меняется. Ключи берутся на console.anthropic.com и platform.openai.com → API keys.</p>
+        <label class="f">Учёт трат Claude (строка из бота) <span class="hint" id="s-spend-cur"></span>
+          <input type="password" id="s-spend" placeholder="https://…/api/public/ai-spend#aisp_…" autocomplete="off" spellcheck="false"></label>
+        <p class="hint">Пустое поле — ключ не меняется. Ключи берутся на console.anthropic.com и platform.openai.com → API keys.
+          Строка учёта — в боте: «💰 Балансы API» → Claude → «🔌 Подключить проект»; бот покажет, сколько тратит этот сайт. «off» — отключить.</p>
+        <label class="f">Модель Claude <span class="hint">— пишет статьи, подбирает темы, готовит правки и ссылки; меняется сразу</span>
+          <select id="s-model"></select></label>
       </div>
     </section>
     <section class="card">
@@ -611,6 +617,11 @@ async function load(selectSlug) {
   articles = d.articles;
   $("now").textContent = "сейчас в Алматы: " + fmtDate(d.now);
   $("model").textContent = "· " + d.writer_model;
+  // список моделей для новых статей; выбранное здесь не трогаем при обновлении списка
+  if (!$("g-model").options.length) {
+    $("g-model").innerHTML = Object.entries(d.models).map(([id, label]) => `<option value="${esc(id)}">${esc(label.split(" —")[0])}</option>`).join("");
+    $("g-model").value = d.writer_model;
+  }
   $("cats").innerHTML = [...new Set(articles.map(a => a.category).filter(Boolean))].map(c => `<option value="${esc(c)}">`).join("");
   renderList();
   if (selectSlug) open(articles.find(a => a.slug === selectSlug) || null);
@@ -663,7 +674,7 @@ function renderQueue(d) {
   $("q-count").textContent = d.pending ? `· пишется ${d.pending}` : "";
   const items = d.items.filter(it => it.stage !== "cancelled").slice(0, 8);
   $("q-list").innerHTML = items.map(it => `<li class="${it.stage}"><b>${esc(it.title || it.topic || (it.origin === "auto" ? "Автопилот подбирает тему" : "Статья по источнику"))}</b>
-    <span class="st">${esc(qStatus(it))}</span>${it.origin !== "manual" ? `<span class="hint">${it.origin === "auto" ? "🤖" : "☑︎"}</span>` : ""}
+    <span class="st">${esc(qStatus(it))}</span>${it.model ? `<span class="hint">${it.model.includes("sonnet") ? "Sonnet" : "Opus"}</span>` : ""}${it.origin !== "manual" ? `<span class="hint">${it.origin === "auto" ? "🤖" : "☑︎"}</span>` : ""}
     ${it.stage === "done" ? `<button class="btn" data-qopen="${esc(it.slug)}">Открыть</button>` : ""}
     ${it.stage === "queued" ? `<button class="btn" data-qcancel="${it.id}">Отменить</button>` : ""}</li>`).join("");
   $("q-list").classList.toggle("hidden", !items.length);
@@ -685,7 +696,7 @@ const loadQueue = () => api("/admin/api/queue").then(renderQueue).catch(() => { 
 async function enqueue(body, btn) {
   busy(btn, true, "Ставлю в очередь…");
   try {
-    const d = await api("/admin/api/queue", {method: "POST", body: JSON.stringify({words: $("g-words").value, ...body})});
+    const d = await api("/admin/api/queue", {method: "POST", body: JSON.stringify({words: $("g-words").value, model: $("g-model").value, ...body})});
     qMine.add(d.item.id); qSeen[d.item.id] = d.item.stage; renderQueue(d);
     toast("Статья в очереди: текст и обложка уже готовятся. Когда будет готова — встанет на ближайший свободный день.");
     document.getElementById("q-card").scrollIntoView({behavior: "smooth", block: "start"});
@@ -1030,7 +1041,7 @@ document.addEventListener("click", async e => {
   if (e.target.id !== "t-bulk-go") return;
   const b = e.target; busy(b, true, "Ставлю в очередь…");
   try {
-    const d = await api("/admin/api/queue/topics", {method: "POST", body: JSON.stringify({ids: [...picked]})});
+    const d = await api("/admin/api/queue/topics", {method: "POST", body: JSON.stringify({ids: [...picked], words: $("g-words").value, model: $("g-model").value})});
     d.items.slice(0, d.added).forEach(it => { qMine.add(it.id); qSeen[it.id] = it.stage; });
     picked.clear(); renderQueue(d); renderTopics();
     toast(`В очереди статей: ${d.added}. Пишутся по очереди на сервере, страницу можно закрыть.`);
@@ -1310,7 +1321,10 @@ async function showSettings() {
     const s = await api("/admin/api/settings");
     $("s-ant-cur").textContent = s.anthropic_key ? `— сейчас ${s.anthropic_key}` : "— не задан";
     $("s-oai-cur").textContent = s.openai_key ? `— сейчас ${s.openai_key}` : "— не задан";
+    $("s-spend-cur").textContent = s.spend_link ? `— подключено: ${s.spend_link}` : "— не подключено";
     $("s-login").textContent = "логин: " + s.login;
+    $("s-model").innerHTML = Object.entries(s.models).map(([id, label]) => `<option value="${esc(id)}">${esc(label)}</option>`).join("");
+    $("s-model").value = s.writer_model;
   } catch (e) { toast(e.message, true); }
 }
 async function tgStatus() {
@@ -1333,13 +1347,21 @@ $("tg-unlink").onclick = async () => {
 $("b-settings").onclick = () => { showSettings(); tgStatus(); };
 $("keys-link").onclick = e => { e.preventDefault(); showSettings(); tgStatus(); };
 $("s-back").onclick = () => { document.body.classList.remove("view-settings"); checkKeys(); };
+$("s-model").onchange = async () => {
+  try {
+    const d = await api("/admin/api/settings", {method: "POST", body: JSON.stringify({claude_model: $("s-model").value})});
+    toast(d.changed.length ? "Сохранено: " + d.changed.join(", ") : "Ничего не изменилось");
+    $("model").textContent = "· " + $("s-model").value;
+    $("g-model").value = $("s-model").value;
+  } catch (e) { toast(e.message, true); }
+};
 $("s-save").onclick = async () => {
   const b = $("s-save"); busy(b, true, "Сохраняю…");
   try {
     const d = await api("/admin/api/settings", {method: "POST", body: JSON.stringify({
-      anthropic_key: $("s-ant").value, openai_key: $("s-oai").value,
+      anthropic_key: $("s-ant").value, openai_key: $("s-oai").value, spend_link: $("s-spend").value,
       password_current: $("s-pass-cur").value, password_new: $("s-pass-new").value})});
-    ["s-ant", "s-oai", "s-pass-cur", "s-pass-new"].forEach(id => { $(id).value = ""; });
+    ["s-ant", "s-oai", "s-spend", "s-pass-cur", "s-pass-new"].forEach(id => { $(id).value = ""; });
     toast(d.changed.length ? "Сохранено: " + d.changed.join(", ") : "Ничего не изменилось");
     await showSettings();
   } catch (e) { toast(e.message, true); }

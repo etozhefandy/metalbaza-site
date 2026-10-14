@@ -4,7 +4,12 @@
 declare(strict_types=1);
 require_once __DIR__ . '/lib.php';
 
-const CLAUDE_MODEL = 'claude-opus-5-5';
+const CLAUDE_MODEL = 'claude-opus-5-5';   // по умолчанию; выбирается в «Настройках» админки
+// Модели Claude для статей, тем, правок и перелинковки. Цены — за 1 млн токенов (вход / выход), anthropic.com/pricing.
+const CLAUDE_MODELS = [
+    'claude-opus-5-5' => 'Opus 5.5 — сильнее всего ($4 / $20)',
+    'claude-sonnet-5-5' => 'Sonnet 5.5 — вдвое дешевле, для статей обычно хватает ($2 / $10)',
+];
 const IMAGE_MODEL = 'gpt-image-2';
 const IMAGE_FALLBACK = 'gpt-image-1.5';  // gpt-image-1 и dall-e-3 OpenAI выводит из работы
 const IMAGE_QUALITY = 'medium';
@@ -45,17 +50,59 @@ function P(string $key, array $vars = [])
     return strtr($v, $map);
 }
 
+// ---------------------------------------------------------------- учёт трат Claude (бот autoalfimov)
+
+/**
+ * Сообщить боту, сколько токенов ушло на ответ Claude: баланс Anthropic общий у сайтов и ботов, а остаток владелец
+ * смотрит в Mini App бота («💰 Балансы API»). Строка подключения — из бота («🔌 Подключить проект»):
+ * `https://<бот>/api/public/ai-spend#aisp_…`, хранится в settings.json (`spend_link`, админка → Настройки).
+ * Не задана — ничего не шлём. Ошибки сети молча пропускаем: учёт не должен мешать статье.
+ */
+function report_ai_spend(string $model, array $usage): void
+{
+    $link = trim((string) (settings()['spend_link'] ?? ''));
+    if ($link === '' || !$usage || !str_contains($link, '#')) return;
+    [$url, $token] = explode('#', $link, 2);
+    $payload = json_encode(['model' => $model, 'usage' => $usage], JSON_UNESCAPED_UNICODE);
+    if (getenv('ALFIMOV_OFFLINE')) { $GLOBALS['ai_spend_sent'][] = [$url, $token, json_decode($payload, true)]; return; }
+    $ch = curl_init($url);
+    curl_setopt_array($ch, [CURLOPT_POST => true, CURLOPT_RETURNTRANSFER => true, CURLOPT_TIMEOUT => 5, CURLOPT_CONNECTTIMEOUT => 3,
+        CURLOPT_HTTPHEADER => ['Authorization: Bearer ' . $token, 'content-type: application/json'], CURLOPT_POSTFIELDS => $payload]);
+    @curl_exec($ch);
+}
+
+const SPEND_LINK_RE = '~^https://[^\s#]+/api/public/ai-spend#aisp_[A-Za-z0-9_-]{20,}$~';
+
 // ---------------------------------------------------------------- Claude
 
 /**
  * Запрос к Claude со стримингом (длинные ответы без обрыва по таймауту) → [текст, stop_reason].
  * $post — подмена HTTP для тестов: fn(array $body): array [http_code, raw_sse_or_json].
  */
+/**
+ * Модель для одной статьи из очереди (выбрана при постановке): claude_override('claude-…') — задать,
+ * claude_override(null) — сбросить, claude_override() — узнать.
+ */
+function claude_override(?string $m = null): ?string
+{
+    static $o = null;
+    if (func_num_args()) $o = $m !== null && isset(CLAUDE_MODELS[$m]) ? $m : null;
+    return $o;
+}
+
+/** Модель: выбранная для статьи, иначе из «Настроек» (неизвестная или пустая — по умолчанию). */
+function claude_model(): string
+{
+    if ($o = claude_override()) return $o;
+    $m = (string) (settings()['claude_model'] ?? '');
+    return isset(CLAUDE_MODELS[$m]) ? $m : CLAUDE_MODEL;
+}
+
 function claude(array $body, ?callable $post = null): array
 {
     $key = trim((string) (settings()['anthropic_key'] ?? ''));
     if ($post === null && $key === '') throw new AiError('Нет ключа Claude — вставьте его в «Настройках» админки');
-    $body = ['model' => CLAUDE_MODEL, 'stream' => true] + $body;
+    $body = ['model' => claude_model(), 'stream' => true] + $body;
     if ($post) {
         [$code, $raw] = $post($body);
     } else {
@@ -80,14 +127,22 @@ function claude(array $body, ?callable $post = null): array
     }
     $text = '';
     $stop = '';
+    $usage = [];
+    $model = (string) $body['model'];
     foreach (preg_split('/\r?\n/', (string) $raw) as $line) {
         if (!str_starts_with($line, 'data:')) continue;
         $ev = json_decode(trim(substr($line, 5)), true);
         if (!is_array($ev)) continue;
         $type = $ev['type'] ?? '';
         if ($type === 'content_block_delta' && ($ev['delta']['type'] ?? '') === 'text_delta') $text .= $ev['delta']['text'];
-        elseif ($type === 'message_delta') $stop = $ev['delta']['stop_reason'] ?? $stop;
-        elseif ($type === 'error') {
+        elseif ($type === 'message_start') {
+            $usage = (array) ($ev['message']['usage'] ?? []);
+            $model = (string) ($ev['message']['model'] ?? $model);
+        } elseif ($type === 'message_delta') {
+            $stop = $ev['delta']['stop_reason'] ?? $stop;
+            $usage = array_merge($usage, (array) ($ev['usage'] ?? []));   // итог по выходу (и поиску) — в конце
+            report_ai_spend($model, $usage);
+        } elseif ($type === 'error') {
             $t = $ev['error']['type'] ?? '';
             if ($t === 'overloaded_error') throw new AiError('Claude сейчас перегружен — попробуйте через пару минут');
             throw new AiError('Ошибка Claude: ' . ($ev['error']['message'] ?? $t));

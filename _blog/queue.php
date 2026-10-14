@@ -73,6 +73,8 @@ function queue_add(array $spec): array
         'topic' => $topic, 'topic_key' => (string) ($spec['topic_key'] ?? ''),
         'keywords' => array_values(str_list($spec['keywords'] ?? [])), 'notes' => (string) ($spec['notes'] ?? ''),
         'words' => max(500, min(4000, (int) ($spec['words'] ?? 1500) ?: 1500)), 'source' => (bool) $source,
+        // модель, выбранная при постановке; пусто — из «Настроек» на момент написания
+        'model' => isset(CLAUDE_MODELS[(string) ($spec['model'] ?? '')]) ? (string) $spec['model'] : '',
         'stage' => 'queued', 'tasks' => ($topic === '' && !$source ? ['topic' => $todo] : []) + ['text' => $todo, 'cover' => $todo],
         'slug' => '', 'title' => '', 'publish_at' => '', 'cover_path' => '', 'error' => '',
     ];
@@ -222,6 +224,16 @@ function queue_fire(string $secret, ?callable $fire = null): void
 
 /** Сама работа задачи → данные для статьи. */
 function queue_run(string $task, array $item, ?callable $post = null): array
+{
+    claude_override(($item['model'] ?? '') ?: null);
+    try {
+        return queue_run_task($task, $item, $post);
+    } finally {
+        claude_override(null);
+    }
+}
+
+function queue_run_task(string $task, array $item, ?callable $post = null): array
 {
     $cfg = queue_settings();
     if ($task === 'topic') {

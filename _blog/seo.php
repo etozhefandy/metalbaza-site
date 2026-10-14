@@ -366,6 +366,7 @@ function geo_ask_claude(string $q, ?callable $http = null): array
             'tools' => [['type' => 'web_search_20250305', 'name' => 'web_search', 'max_uses' => 3]]],
             JSON_UNESCAPED_UNICODE), 100, $http);
     if ($code !== 200) throw new AiError("Claude ($code): " . ($d['error']['message'] ?? 'ошибка'));
+    report_ai_spend((string) ($d['model'] ?? GEO_CLAUDE_MODEL), (array) ($d['usage'] ?? []));
     $text = '';
     $urls = [];
     foreach ($d['content'] ?? [] as $b) {
