@@ -8,6 +8,7 @@ file_put_contents("$tmp/tg-config.php", "<?php return ['tg_token' => 'T', 'tg_ch
 putenv("ALFIMOV_TG_CONFIG=$tmp/tg-config.php");
 putenv("ALFIMOV_SITE=$root/dist");
 putenv("ALFIMOV_DATA=$tmp/data");
+putenv("ALFIMOV_TG_HUB=$tmp");
 putenv('ALFIMOV_NOW=2026-10-13T12:00:00+05:00');
 putenv('ALFIMOV_OFFLINE=1');
 require "$root/dist/_blog/seo.php";

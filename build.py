@@ -774,6 +774,8 @@ def llms_txt():
 
 
 def php_val(v):
+    if isinstance(v, int):
+        return str(v)
     if isinstance(v, str):
         return "'" + v.replace("\\", "\\\\").replace("'", "\\'") + "'"
     if isinstance(v, (list, tuple)):
@@ -786,7 +788,7 @@ def site_php():
     n = cfg.NICHE
     consts = {
         "SITE_HOST": cfg.HOST, "SITE_URL": cfg.SITE_URL, "SITE_BRAND": cfg.BRAND, "SITE_BRAND_UPPER": cfg.BRAND_UPPER,
-        "SITE_DATA": cfg.DATA_DIR_NAME, "SITE_BOT": cfg.BOT_USERNAME, "SITE_PHONE": cfg.PHONE_DISPLAY,
+        "SITE_DATA": cfg.DATA_DIR_NAME, "SITE_BOT": cfg.BOT_USERNAME, "SITE_TG_LABEL": cfg.TG_LABEL, "SITE_TG_HUB_UP": cfg.TG_HUB_UP, "SITE_PHONE": cfg.PHONE_DISPLAY,
         "NICHE_ABOUT": n["about"], "NICHE_READER": n["reader"], "NICHE_CTA": n["cta"], "NICHE_AUTHOR": n["author"],
         "NICHE_SEEDS": n["seeds"], "NICHE_SEED_PATTERNS": n["patterns"], "SITE_INDEXNOW_KEY": INDEXNOW_KEY, "NICHE_GEO_QUESTIONS": n["geo_questions"],
         "NICHE_BRAND_RE": n["brand_re"], "NICHE_IMAGE_STYLE": n["image_style"],
