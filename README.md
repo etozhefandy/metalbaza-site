@@ -49,7 +49,7 @@ python3 -m pytest tests                                                        #
 ```
 
 Собирает сайт, проверяет PHP и SEO-аудит, кладёт `dist/` коммитом в ветку `deploy`. Вебхук GitHub дёргает
-Plesk Git (ветка `deploy` → `metalbaza.kz/httpdocs`), через ~10 секунд версия на сайте:
+Plesk Git (ветка `deploy` → `metalbaza.kz/httpdocs`, режим «Автоматически»; вебхук настроен в GitHub), через ~10 секунд версия на сайте:
 https://metalbaza.kz/version.txt.
 
 ## Второй сайт на этом движке
