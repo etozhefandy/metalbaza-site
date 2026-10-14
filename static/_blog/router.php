@@ -88,7 +88,9 @@ if (in_array($_GET['route'] ?? '', ['home', 'index', 'article'], true)) {
     try {
         require_once __DIR__ . '/seo.php';
         seo_maybe_kick();
+        require_once __DIR__ . '/autopost.php';
+        autopost_maybe_kick();
     } catch (Throwable $ex) {
-        error_log('seo kick: ' . $ex->getMessage());
+        error_log('seo/autopost kick: ' . $ex->getMessage());
     }
 }

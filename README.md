@@ -15,6 +15,7 @@ SEO-сайт заявок на металлопрокат: покупатель 
 | Форма заявки → журнал + Telegram | `static/api/send.php`, журнал — `static/_blog/leads.php` |
 | Бот заявок (привязка группы по PIN) | `static/api/_tg.php`, `tg-hook.php` |
 | Блог, ИИ-автор, SEO-автопилот | `static/_blog/` (`lib.php`, `ai.php`, `seo.php`) |
+| Автопилот статей: свободный день в плане → тема, статья, обложка с людьми, в план | `static/_blog/autopost.php`, `static/api/autopost-tick.php`; включается в админке («📝 Статьи» → «🤖 Автопилот») |
 | Админка | https://metalbaza.kz/admin/ — `static/admin/`, `static/_blog/admin.tpl` |
 | Редиректы и закрытые адреса | `static/.htaccess` |
 
