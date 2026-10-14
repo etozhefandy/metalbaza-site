@@ -99,7 +99,7 @@ label.f.inline select { width: auto; }
 .tabs-top button { white-space: nowrap; }
 @media (max-width: 1250px) { .tabs-top #nav-count { display: none; } }
 body.view-edit .tabs-top, body.view-settings .tabs-top { visibility: hidden; }
-body.home-list #new-card, body.home-list #seo-card, body.home-new #list-card, body.home-new #seo-card,
+body.home-list #new-card, body.home-list #seo-card, body.home-new #list-card, body.home-new #seo-card, body.home-new #ap-card, body.home-seo #ap-card, body.home-leads #ap-card,
 body.home-seo #list-card, body.home-seo #new-card, body.home-seo #keys-warn { display: none; }
 #leads-card { display: none; }
 body.home-leads #leads-card { display: block; }
@@ -352,6 +352,16 @@ body:not(.view-edit) .mbar { display: none !important; }
       </div>
       <ul class="acards" id="list"></ul>
     </section>
+    <section class="card" id="ap-card">
+      <div class="row" style="gap:10px;flex-wrap:wrap">
+        <h2 style="margin:0">🤖 Автопилот статей</h2>
+        <label class="f inline"><input type="checkbox" id="ap-on"> включён</label>
+        <label class="f inline">Ритм<select id="ap-week"><option value="1">1 в неделю (вт)</option><option value="2">2 в неделю (вт, чт)</option><option value="3">3 в неделю (пн, ср, пт)</option></select></label>
+        <label class="f inline">Обложка<select id="ap-mode"><option value="people">с людьми</option><option value="auto">авто (иногда с людьми)</option><option value="abstract">без людей</option></select></label>
+      </div>
+      <p class="hint" id="ap-status" style="margin:10px 0 0">…</p>
+      <p class="hint" style="margin:6px 0 0">Когда в плане на ближайшую неделю есть свободный день, сайт сам берёт тему из списка тем (пуст — подбирает по спросу Google и Яндекса), пишет статью, рисует обложку и ставит её на этот день, 10:00. Вам приходит сообщение в Telegram; до выхода статью можно поправить или снять с плана.</p>
+    </section>
 
     <!-- SEO-автопилот: раз в неделю сам (без кнопок), отчёт приходит в Telegram -->
     <section class="card" id="leads-card">
@@ -507,7 +517,7 @@ body:not(.view-edit) .mbar { display: none !important; }
           </div>
           <input type="text" id="img-idea" placeholder="Идея картинки (необязательно — иначе ИИ возьмёт главную мысль статьи)" style="margin-top:10px">
           <p class="hint" id="img-note" style="margin:8px 0 0"></p>
-          <select id="img-mode" style="margin-top:8px" title="Сюжет картинки"><option value="auto">Сюжет: авто (иногда с людьми)</option><option value="people">Сюжет: с людьми</option><option value="abstract">Сюжет: абстракция, без людей</option></select>
+          <select id="img-mode" style="margin-top:8px" title="Сюжет картинки"><option value="people">Сюжет: с людьми</option><option value="auto">Сюжет: авто (иногда с людьми)</option><option value="abstract">Сюжет: абстракция, без людей</option></select>
           <div class="row" style="margin-top:8px">
             <button class="btn btn-p" type="button" id="b-cover-ai">Сгенерировать (ИИ)</button>
             <label class="btn">Загрузить свою<input type="file" id="f-file" accept="image/jpeg,image/png,image/webp" hidden></label>
@@ -627,6 +637,22 @@ $("home-nav").onclick = e => {
   if (document.body.classList.contains("view-edit") || document.body.classList.contains("view-settings")) return;
   setHomeView(b.dataset.v); window.scrollTo(0, 0);
 };
+// ---------- автопилот статей
+const AP_STEP = {topic: "выбирает тему", write: "пишет статью", publish: "рисует обложку и ставит в план"};
+function renderAp(d) {
+  $("ap-on").checked = d.on; $("ap-week").value = String(d.per_week); $("ap-mode").value = d.image_mode;
+  const last = d.last ? (d.last.error ? `Последний раз (${esc(d.last.at)}) не получилось: ${esc(d.last.error)}`
+    : `Последняя: «${esc(d.last.title)}» — выйдет ${esc((d.last.publish_at || "").replace("T", " "))}`) : "";
+  $("ap-status").innerHTML = !d.ready ? "Нужны ключи Claude и OpenAI в «Настройках»."
+    : d.running ? `Сейчас ${AP_STEP[d.running] || d.running}${d.topic ? ": «" + esc(d.topic) + "»" : ""}…`
+    : !d.on ? "Выключен: статьи пишутся только вручную." + (last ? " " + last : "")
+    : (d.due ? "Есть свободный день — статья появится в ближайшие минуты после захода на сайт." : `План на неделю заполнен (в очереди ${d.queue}).`) + (last ? " " + last : "");
+}
+const apSave = body => api("/admin/api/autopost", {method: "POST", body: JSON.stringify(body)}).then(renderAp).catch(e => toast(e.message, true));
+$("ap-on").onchange = () => apSave({on: $("ap-on").checked});
+$("ap-week").onchange = () => { try { localStorage.setItem("per_week", $("ap-week").value); } catch (e) {} $("i-week").value = $("ap-week").value; apSave({per_week: +$("ap-week").value}); };
+$("ap-mode").onchange = () => apSave({image_mode: $("ap-mode").value});
+api("/admin/api/autopost").then(d => { renderAp(d); try { if (!localStorage.getItem("per_week")) $("i-week").value = String(d.per_week); } catch (e) {} }).catch(() => {});
 // ---------- журнал заявок
 async function loadLeads(month) {
   const d = await api("/admin/api/leads" + (month ? "?m=" + encodeURIComponent(month) : ""));
@@ -1128,7 +1154,7 @@ $("b-auto").onclick = async () => {
   if (await generate({topic: t.topic, keywords: kw(t)}, b, "Пишу…")) loadTopics();
 };
 try { $("i-week").value = localStorage.getItem("per_week") || "2"; } catch (e) {}
-$("i-week").onchange = () => { try { localStorage.setItem("per_week", week()); } catch (e) {} loadTopics(); };
+$("i-week").onchange = () => { try { localStorage.setItem("per_week", week()); } catch (e) {} loadTopics(); $("ap-week").value = week(); apSave({per_week: +week()}); };
 api("/admin/api/trends?per_week=" + week()).then(renderDemand).catch(() => {});
 loadTopics();
 // ---------- SEO-автопилот

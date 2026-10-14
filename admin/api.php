@@ -8,6 +8,7 @@ declare(strict_types=1);
 require dirname(__DIR__) . '/_blog/auth.php';
 require_once dirname(__DIR__) . '/_blog/seo.php';
 require_once dirname(__DIR__) . '/_blog/leads.php';
+require_once dirname(__DIR__) . '/_blog/autopost.php';
 
 header('X-Robots-Tag: noindex, nofollow');
 header('Cache-Control: no-store');
@@ -225,6 +226,16 @@ if ($method === 'GET' && preg_match('#^api/leads\.csv$#', $route)) {
 if (($_SERVER['HTTP_X_ADMIN'] ?? '') !== '1') fail('forbidden', 403);
 
 try {
+    if ($method === 'GET' && $route === 'api/autopost') reply(autopost_view());
+    if ($method === 'POST' && $route === 'api/autopost') {
+        $d = body();
+        $s = settings();
+        if (array_key_exists('on', $d)) $s['autopost'] = (bool) $d['on'];
+        if (isset($d['per_week']) && isset(SLOT_DAYS[(int) $d['per_week']])) $s['per_week'] = (int) $d['per_week'];
+        if (isset($d['image_mode']) && in_array($d['image_mode'], IMG_MODES, true)) $s['image_mode'] = $d['image_mode'];
+        save_settings($s);
+        reply(autopost_view());
+    }
     if ($method === 'GET' && $route === 'api/leads') {
         $months = lead_months();
         $month = (string) ($_GET['m'] ?? '') ?: ($months[0] ?? now()->format('Y-m'));
