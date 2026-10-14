@@ -14,7 +14,7 @@ $u = json_decode((string) file_get_contents('php://input'), true);
 try {
     // меню команд «/» — один раз (если бот подключили до появления меню)
     $st = tg_state();
-    if (($st['commands_v'] ?? 0) < 1) { tg_set_commands(); $st['commands_v'] = 1; tg_save_state($st); }
+    if (($st['commands_v'] ?? 0) < 2) { tg_set_commands(); $st['commands_v'] = 2; tg_save_state($st); }
     if (is_array($u)) tg_handle_update($u, null, function (string $data): string {
         require_once dirname(__DIR__) . '/_blog/seo.php';   // кнопки под отчётом SEO
         return seo_tg_callback($data);

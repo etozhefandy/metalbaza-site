@@ -6,6 +6,8 @@ if (!defined('SITE_BRAND')) define('SITE_BRAND', 'Металбаза');
 if (!defined('SITE_BRAND_UPPER')) define('SITE_BRAND_UPPER', 'METALBAZA.KZ');
 if (!defined('SITE_DATA')) define('SITE_DATA', 'metalbaza-data');
 if (!defined('SITE_BOT')) define('SITE_BOT', '');
+if (!defined('SITE_TG_LABEL')) define('SITE_TG_LABEL', 'металлопрокат');
+if (!defined('SITE_TG_HUB_UP')) define('SITE_TG_HUB_UP', 1);
 if (!defined('SITE_PHONE')) define('SITE_PHONE', '+7 776 902 66 69');
 if (!defined('NICHE_ABOUT')) define('NICHE_ABOUT', 'Металбаза (metalbaza.kz) — сервис подбора поставщиков металлопроката в Казахстане: покупатель оставляет одну заявку, её получают несколько металлобаз его города и присылают цены и сроки доставки. Сам сайт металл не продаёт и цен не назначает.');
 if (!defined('NICHE_READER')) define('NICHE_READER', 'прораб, снабженец строительной компании, частный застройщик или хозяин дома, который покупает металл');
