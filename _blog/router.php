@@ -90,6 +90,8 @@ if (in_array($_GET['route'] ?? '', ['home', 'index', 'article'], true)) {
         seo_maybe_kick();
         require_once __DIR__ . '/queue.php';
         queue_maybe_kick();
+        require_once dirname(__DIR__) . '/api/_hub.php';
+        hub_tick_kick();   // проверка доменов/SSL в пульте — раз в 12 часов
     } catch (Throwable $ex) {
         error_log('seo/queue kick: ' . $ex->getMessage());
     }
