@@ -20,7 +20,7 @@ ErrorDocument 404 /404.html
   # отказы доступа попадают в лог ошибок, и fail2ban хостинга банит IP (так забанило нас самих).
   RewriteCond %{THE_REQUEST} \s/+_blog/ [NC]
   RewriteRule ^ - [R=404,L]
-  RewriteRule ^api/(config|_tg)\.php$ - [R=404,L]
+  RewriteRule ^api/(_|config\.php) - [R=404,L]
   RewriteRule ^blog$ /blog/ [L,R=301]
   RewriteRule ^blog/([a-z0-9-]+)$ /blog/$1/ [L,R=301]
   RewriteRule ^$ _blog/router.php?route=home [L]
@@ -43,6 +43,8 @@ ErrorDocument 404 /404.html
   Header always set X-Content-Type-Options "nosniff"
   Header always set Referrer-Policy "strict-origin-when-cross-origin"
   Header always set X-Frame-Options "SAMEORIGIN"
+  Header always set Strict-Transport-Security "max-age=31536000"
+  Header always set Permissions-Policy "camera=(), microphone=(), geolocation=(), payment=()"
   <FilesMatch "\.(css|js|svg|png|jpg|jpeg|webp|woff2)$">
     Header set Cache-Control "public, max-age=31536000, immutable"
   </FilesMatch>
