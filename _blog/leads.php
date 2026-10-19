@@ -57,6 +57,14 @@ function leads_list(string $month): array
 }
 
 /** CSV для расчётов с покупателями заявок (Excel открывает UTF-8 с BOM и «;»). */
+/** Ячейка CSV: значение, начинающееся с = + - @, Excel выполнит как формулу — ставим перед ним апостроф. */
+function csv_cell($v): string
+{
+    $v = (string) $v;
+    if ($v !== '' && strpos("=+-@\t\r", $v[0]) !== false && !preg_match('/^\+?[0-9][0-9 ()-]{6,}$/', $v)) $v = "'" . $v;   // обычный телефон оставляем как есть
+    return '"' . str_replace('"', '""', $v) . '"';
+}
+
 function leads_csv(array $leads): string
 {
     $rows = [['№', 'Дата', 'Телефон', 'Имя', 'Товар', 'Город', 'Комментарий', 'Страница', 'Кому передана']];
@@ -66,7 +74,7 @@ function leads_csv(array $leads): string
     }
     $csv = "\xEF\xBB\xBF";
     foreach ($rows as $r) {
-        $csv .= implode(';', array_map(fn($v) => '"' . str_replace('"', '""', (string) $v) . '"', $r)) . "\r\n";
+        $csv .= implode(';', array_map('csv_cell', $r)) . "\r\n";
     }
     return $csv;
 }
