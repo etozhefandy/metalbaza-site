@@ -237,7 +237,7 @@ body:not(.view-edit) .mbar { display: none !important; }
     <button type="button" data-v="seo">📈 SEO</button>
     <button type="button" data-v="leads">📥 Заявки</button>
   </nav>
-  <a class="btn" href="/blog/" target="_blank">Открыть блог</a>
+  <a class="btn" href="%%SITE_ORIGIN%%/blog/" target="_blank">Открыть блог</a>
   <button class="btn" id="b-settings">Настройки</button>
   <button class="btn" id="b-logout">Выйти</button>
 </header>
@@ -377,7 +377,7 @@ body:not(.view-edit) .mbar { display: none !important; }
       <h2>Заявки с сайта <small id="leads-count"></small></h2>
       <div class="row" style="gap:8px;margin-bottom:12px">
         <select id="leads-month"></select><span class="spacer"></span>
-        <a class="btn" id="leads-csv" href="/admin/api/leads.csv">Скачать CSV (Excel)</a>
+        <a class="btn" id="leads-csv" href="%%ADMIN_BASE%%/api/leads.csv">Скачать CSV (Excel)</a>
       </div>
       <div style="overflow-x:auto"><table class="leads" style="width:100%;border-collapse:collapse;font-size:14px">
         <thead><tr><th align="left">Дата</th><th align="left">Телефон</th><th align="left">Что нужно</th><th align="left">Город</th><th align="left">Страница</th></tr></thead>
@@ -466,7 +466,7 @@ body:not(.view-edit) .mbar { display: none !important; }
       </div>
     </section>
     <div class="row"><button class="btn btn-p" id="s-save">Сохранить настройки</button><span class="spacer"></span>
-      <a class="btn" href="/admin/api/export">Скачать копию всех статей</a></div>
+      <a class="btn" href="%%ADMIN_BASE%%/api/export">Скачать копию всех статей</a></div>
   </div>
 
   <!-- ===== РЕДАКТОР СТАТЬИ ===== -->
@@ -570,6 +570,8 @@ body:not(.view-edit) .mbar { display: none !important; }
 <div class="toast hidden" id="toast"></div>
 
 <script>
+// Адрес API админки и сайта: на самом сайте — "/admin" и "", в пульте admin.alfimov.kz — "/s/<домен>/admin" и "https://<домен>".
+const BASE = "%%ADMIN_BASE%%", SITE = "%%SITE_ORIGIN%%";
 const $ = id => document.getElementById(id);
 const FIELDS = ["title", "slug", "seo_title", "description", "lead", "summary", "category", "body_md", "cover_path", "author", "read_min", "status", "publish_at"];
 let articles = [], current = null, filter = "all", dirty = false, pendingIdea = null;
@@ -595,11 +597,11 @@ async function api(path, opts = {}) {
 async function runJob(path, body) {
   const {job} = await api(path, {method: "POST", body: JSON.stringify(body)});
   let done = null;
-  api("/admin/api/run", {method: "POST", body: JSON.stringify({job})}).then(d => { done = d; }).catch(() => {});
+  api(BASE + "/api/run", {method: "POST", body: JSON.stringify({job})}).then(d => { done = d; }).catch(() => {});
   const t0 = Date.now();
   while (Date.now() - t0 < 11 * 60 * 1000) {
     await new Promise(r => setTimeout(r, 3000));
-    const d = done || await api("/admin/api/job?id=" + job).catch(() => null);
+    const d = done || await api(BASE + "/api/job?id=" + job).catch(() => null);
     if (d && d.status === "done") return d.result;
     if (d && d.status === "error") throw new Error(d.error);
   }
@@ -613,7 +615,7 @@ const fmtDate = iso => iso ? new Date(iso.length === 16 ? iso + ":00+05:00" : is
 
 // ---------- список
 async function load(selectSlug) {
-  const d = await api("/admin/api/articles");
+  const d = await api(BASE + "/api/articles");
   articles = d.articles;
   $("now").textContent = "сейчас в Алматы: " + fmtDate(d.now);
   $("model").textContent = "· " + d.writer_model;
@@ -633,7 +635,7 @@ function renderList() {
   const items = articles.filter(a => filter === "all" || a.state === filter);
   $("list").innerHTML = items.length ? items.map(a => {
     const [label, cls] = STATE[a.state];
-    const th = a.cover_path ? `<img class="th" src="${esc(a.cover_path)}" alt="" loading="lazy">` : `<div class="th none">без обложки</div>`;
+    const th = a.cover_path ? `<img class="th" src="${esc(SITE + a.cover_path)}" alt="" loading="lazy">` : `<div class="th none">без обложки</div>`;
     return `<li class="acard" data-slug="${esc(a.slug)}">${th}<div class="b">
       <div class="m"><span class="badge ${cls}">${label}</span>${a.publish_at ? esc(fmtDate(a.publish_at)) : ""}</div>
       <div class="t">${esc(a.title)}</div><span class="edit">Редактировать →</span></div></li>`;
@@ -692,11 +694,11 @@ function renderQueue(d) {
   clearTimeout(qPoll);
   if (d.pending) qPoll = setTimeout(loadQueue, 4000);
 }
-const loadQueue = () => api("/admin/api/queue").then(renderQueue).catch(() => { clearTimeout(qPoll); qPoll = setTimeout(loadQueue, 10000); });
+const loadQueue = () => api(BASE + "/api/queue").then(renderQueue).catch(() => { clearTimeout(qPoll); qPoll = setTimeout(loadQueue, 10000); });
 async function enqueue(body, btn) {
   busy(btn, true, "Ставлю в очередь…");
   try {
-    const d = await api("/admin/api/queue", {method: "POST", body: JSON.stringify({words: $("g-words").value, model: $("g-model").value, ...body})});
+    const d = await api(BASE + "/api/queue", {method: "POST", body: JSON.stringify({words: $("g-words").value, model: $("g-model").value, ...body})});
     qMine.add(d.item.id); qSeen[d.item.id] = d.item.stage; renderQueue(d);
     toast("Статья в очереди: текст и обложка уже готовятся. Когда будет готова — встанет на ближайший свободный день.");
     document.getElementById("q-card").scrollIntoView({behavior: "smooth", block: "start"});
@@ -707,20 +709,20 @@ async function enqueue(body, btn) {
 $("q-list").onclick = async e => {
   const o = e.target.closest("[data-qopen]"), c = e.target.closest("[data-qcancel]");
   if (o) { await load(o.dataset.qopen); return; }
-  if (c) { try { renderQueue(await api(`/admin/api/queue/${c.dataset.qcancel}/cancel`, {method: "POST"})); } catch (err) { toast(err.message, true); } }
+  if (c) { try { renderQueue(await api(`${BASE}/api/queue/${c.dataset.qcancel}/cancel`, {method: "POST"})); } catch (err) { toast(err.message, true); } }
 };
-const apSave = body => api("/admin/api/autopilot", {method: "POST", body: JSON.stringify(body)}).then(renderQueue).catch(e => toast(e.message, true));
+const apSave = body => api(BASE + "/api/autopilot", {method: "POST", body: JSON.stringify(body)}).then(renderQueue).catch(e => toast(e.message, true));
 $("ap-on").onchange = () => { apSave({on: $("ap-on").checked}); toast($("ap-on").checked ? "Автопилот включён: когда в плане на неделю есть свободный день, он сам напишет статью с обложкой" : "Автопилот выключен"); };
 $("ap-week").onchange = () => { try { localStorage.setItem("per_week", $("ap-week").value); } catch (e) {} $("i-week").value = $("ap-week").value; apSave({per_week: +$("ap-week").value}); loadTopics(); };
 $("ap-mode").onchange = () => { $("img-mode").value = $("ap-mode").value; apSave({image_mode: $("ap-mode").value}); };
 loadQueue();
 // ---------- журнал заявок
 async function loadLeads(month) {
-  const d = await api("/admin/api/leads" + (month ? "?m=" + encodeURIComponent(month) : ""));
+  const d = await api(BASE + "/api/leads" + (month ? "?m=" + encodeURIComponent(month) : ""));
   const sel = $("leads-month"), months = d.months.length ? d.months : [d.month];
   sel.innerHTML = months.map(m => `<option${m === d.month ? " selected" : ""}>${esc(m)}</option>`).join("");
   sel.onchange = () => loadLeads(sel.value);
-  $("leads-csv").href = "/admin/api/leads.csv?m=" + encodeURIComponent(d.month);
+  $("leads-csv").href = BASE + "/api/leads.csv?m=" + encodeURIComponent(d.month);
   $("leads-count").textContent = `· ${d.leads.length} за ${d.month}`;
   $("leads-rows").innerHTML = d.leads.length ? d.leads.map(l => `<tr style="border-top:1px solid var(--line)">
     <td>${esc(l.at.slice(0, 16).replace("T", " "))}<small>№ ${esc(l.id)}</small></td>
@@ -841,7 +843,7 @@ function refresh() {
       : `Появится на сайте сама ${fmtDate(a.publish_at)} — ничего нажимать не нужно, кроме «Сохранить».`;
   }
   const cp = $("f-cover_path").value, img = $("cover-prev");
-  img.classList.toggle("hidden", !cp); if (cp) img.src = cp;
+  img.classList.toggle("hidden", !cp); if (cp) img.src = SITE + cp;
   $("cover-empty").classList.toggle("hidden", !!cp);
 }
 document.querySelector(".editor").addEventListener("input", e => {
@@ -857,7 +859,7 @@ document.querySelector(".editor").addEventListener("change", () => refresh());
 $("f-status").addEventListener("change", async () => {
   if ($("f-status").value !== "scheduled" || $("f-publish_at").value) return;
   try {
-    const d = await api(`/admin/api/next-slot?per_week=${$("i-week").value}&slug=${encodeURIComponent(current ? current.slug : "")}`);
+    const d = await api(`${BASE}/api/next-slot?per_week=${$("i-week").value}&slug=${encodeURIComponent(current ? current.slug : "")}`);
     $("f-publish_at").value = d.slot; dirty = true; refresh();
     toast(`Дата выхода — ближайший свободный слот: ${fmtDate(d.slot)}. Можно поменять; сохраните статью.`);
   } catch (e) { toast(e.message, true); }
@@ -871,7 +873,7 @@ window.addEventListener("beforeunload", e => { if (dirty) { e.preventDefault(); 
 async function save() {
   const a = collect();
   if (a.status === "scheduled" && a.publish_at) a.publish_at = a.publish_at.slice(0, 16);
-  const d = await api("/admin/api/articles", {method: "POST", body: JSON.stringify({article: a, old_slug: current ? current.slug : null})});
+  const d = await api(BASE + "/api/articles", {method: "POST", body: JSON.stringify({article: a, old_slug: current ? current.slug : null})});
   dirty = false;
   await load(d.article.slug);
   return d.article;
@@ -911,12 +913,12 @@ $("b-back").onclick = () => {
 };
 $("b-preview").onclick = async () => {
   const w = window.open("about:blank", "_blank");
-  try { const a = dirty || !current ? await save() : current; w.location = "/admin/preview/" + a.slug + "/"; }
+  try { const a = dirty || !current ? await save() : current; w.location = BASE + "/preview/" + a.slug + "/"; }
   catch (e) { w.close(); toast(e.message, true); }
 };
 $("b-del").onclick = async () => {
   if (!current || !confirm(`Удалить статью «${current.title}»? Если она на сайте — сразу пропадёт оттуда. Отменить нельзя.`)) return;
-  try { await api("/admin/api/articles/" + current.slug, {method: "DELETE"}); dirty = false; await load(null); toast("Удалено"); }
+  try { await api(BASE + "/api/articles/" + current.slug, {method: "DELETE"}); dirty = false; await load(null); toast("Удалено"); }
   catch (e) { toast(e.message, true); }
 };
 // ИИ всегда пишет НОВУЮ статью: сохранённую (тем более опубликованную) он не перезаписывает.
@@ -965,7 +967,7 @@ $("f-file").onchange = async e => {
   const data = await new Promise(res => { const r = new FileReader(); r.onload = () => res(r.result.split(",")[1]); r.readAsDataURL(file); });
   if (file.size > 20 * 1024 * 1024) { toast("Файл больше 20 МБ", true); e.target.value = ""; return; }
   toast("Загружаю…");
-  try { const d = await api("/admin/api/upload", {method: "POST", body: JSON.stringify({filename: file.name, data})}); $("f-cover_path").value = d.path; dirty = true; refresh(); toast("Обложка загружена — не забудьте сохранить статью"); }
+  try { const d = await api(BASE + "/api/upload", {method: "POST", body: JSON.stringify({filename: file.name, data})}); $("f-cover_path").value = d.path; dirty = true; refresh(); toast("Обложка загружена — не забудьте сохранить статью"); }
   catch (err) { toast(err.message, true); }
   e.target.value = "";
 };
@@ -973,7 +975,7 @@ async function aiImage(kind, idea, btn, label) {
   busy(btn, true, label);
   const t0 = Date.now(), tick = setInterval(() => { btn.textContent = `${label} ${Math.round((Date.now() - t0) / 1000)} с`; }, 1000);
   try {
-    const r = await runJob("/admin/api/image", {
+    const r = await runJob(BASE + "/api/image", {
       kind, idea, mode: $("img-mode").value, title: $("f-title").value, lead: $("f-lead").value, slug: $("f-slug").value,
       summary: $("f-summary").value, body: $("f-body_md").value.slice(0, 6000)});
     if (kind === "cover") $("img-note").textContent = r.main_idea ? "Мысль картинки: " + r.main_idea : "";
@@ -1041,7 +1043,7 @@ document.addEventListener("click", async e => {
   if (e.target.id !== "t-bulk-go") return;
   const b = e.target; busy(b, true, "Ставлю в очередь…");
   try {
-    const d = await api("/admin/api/queue/topics", {method: "POST", body: JSON.stringify({ids: [...picked], words: $("g-words").value, model: $("g-model").value})});
+    const d = await api(BASE + "/api/queue/topics", {method: "POST", body: JSON.stringify({ids: [...picked], words: $("g-words").value, model: $("g-model").value})});
     d.items.slice(0, d.added).forEach(it => { qMine.add(it.id); qSeen[it.id] = it.stage; });
     picked.clear(); renderQueue(d); renderTopics();
     toast(`В очереди статей: ${d.added}. Пишутся по очереди на сервере, страницу можно закрыть.`);
@@ -1049,11 +1051,11 @@ document.addEventListener("click", async e => {
   } catch (err) { toast(err.message, true); busy(b, false); }
 });
 const week = () => $("i-week").value;
-const loadTopics = () => api("/admin/api/topics?per_week=" + week()).then(d => { topics = d.topics || []; renderTopics(); }).catch(() => {});
+const loadTopics = () => api(BASE + "/api/topics?per_week=" + week()).then(d => { topics = d.topics || []; renderTopics(); }).catch(() => {});
 $("t-dedupe").onclick = async e => {
   e.preventDefault();
   const a = $("t-dedupe"); a.textContent = "Проверяю…";
-  try { const d = await api("/admin/api/topics/dedupe?per_week=" + week(), {method: "POST"}); topics = d.topics || []; renderTopics();
+  try { const d = await api(BASE + "/api/topics/dedupe?per_week=" + week(), {method: "POST"}); topics = d.topics || []; renderTopics();
     toast(d.removed ? `Убрано повторов: ${d.removed} — они в «Отклонённых» с пометкой, на что похожи` : "Повторов не нашлось"); }
   catch (err) { toast(err.message, true); }
   a.textContent = "Проверить на повторы сейчас";
@@ -1064,7 +1066,7 @@ $("t-ideas").onclick = async e => {
   const id = (w || r || back || {}).dataset?.write || (r && r.dataset.reject) || (back && back.dataset.restore);
   const t = topics.find(x => x.id === id); if (!t) return;
   if (w) { if (await generate({topic: t.topic, keywords: kw(t), topic_key: (t.main_keyword || "").toLowerCase().trim() + "|" + t.topic.toLowerCase().trim()}, w)) loadTopics(); return; }
-  try { await api("/admin/api/topics/" + t.id, {method: "POST", body: JSON.stringify({status: r ? "rejected" : "new"})});
+  try { await api(BASE + "/api/topics/" + t.id, {method: "POST", body: JSON.stringify({status: r ? "rejected" : "new"})});
     t.status = r ? "rejected" : "new"; renderTopics(); toast(r ? "Тема отклонена — ИИ не будет её предлагать" : "Тема вернулась в новые"); }
   catch (err) { toast(err.message, true); }
 };
@@ -1091,7 +1093,7 @@ async function findTopics(vector) {
   const b = $("b-trends"); busy(b, true, "Ищу…");
   const t0 = Date.now(), tick = setInterval(() => { $("t-status").textContent = `Собираю запросы Google и Яндекса и анализирую… ${Math.round((Date.now() - t0) / 1000)} с (обычно до минуты)`; }, 1000);
   try {
-    const d = vector ? await runJob("/admin/api/trends?per_week=" + week(), {vector}) : await runJob("/admin/api/ideas?per_week=" + week(), {focus: ""});
+    const d = vector ? await runJob(BASE + "/api/trends?per_week=" + week(), {vector}) : await runJob(BASE + "/api/ideas?per_week=" + week(), {focus: ""});
     clearInterval(tick); renderDemand(d);
     topicFilter = "new"; await loadTopics();
     toast(`Готово: новые темы добавлены в список «Темы статей» (${(d.ideas || []).length})`);
@@ -1141,7 +1143,7 @@ $("tu-file").onchange = async e => {
     });
     if (!queries.length) throw new Error("В файле не нашлось листа с запросами — нужна выгрузка «Эффективность» из Search Console");
     const t0 = Date.now(), tick = setInterval(() => { $("tu-status").textContent = `Claude разбирает ${queries.length} запросов и статьи… ${Math.round((Date.now() - t0) / 1000)} с (обычно 1–2 мин)`; }, 1000);
-    try { renderTune(await runJob("/admin/api/tune", {queries, pages})); }
+    try { renderTune(await runJob(BASE + "/api/tune", {queries, pages})); }
     finally { clearInterval(tick); }
     loadTopics();
   } catch (err) { $("tu-status").textContent = ""; toast(err.message, true); }
@@ -1178,7 +1180,7 @@ async function applyCard(card, a) {
     sections: on("sections").map(x => a.sections[+x.dataset.j]), faq: on("faq").map(x => a.faq[+x.dataset.j]),
   };
   if (!changes.seo_title && !changes.description && !changes.add_keywords.length && !changes.sections.length && !changes.faq.length) return false;
-  await api("/admin/api/tune/apply", {method: "POST", body: JSON.stringify({slug: a.slug, changes})});
+  await api(BASE + "/api/tune/apply", {method: "POST", body: JSON.stringify({slug: a.slug, changes})});
   a.applied = true;
   return true;
 }
@@ -1204,7 +1206,7 @@ $("seo-apply-all").onclick = async () => {
   } catch (err) { toast(err.message, true); }
   busy(b, false); renderTune(tune); load(undefined).catch(() => {});
 };
-api("/admin/api/tune").then(d => { if (d && d.created) renderTune(d); }).catch(() => {});
+api(BASE + "/api/tune").then(d => { if (d && d.created) renderTune(d); }).catch(() => {});
 // ---------- придумай сам: первая новая тема из списка (нет — ищем по всему каталогу) → сразу пишем
 $("b-auto").onclick = async () => {
   $("auto-note").textContent = "Тему выберет сервер: первая новая из списка, а если список пуст — по спросу Google и Яндекса.";
@@ -1212,7 +1214,7 @@ $("b-auto").onclick = async () => {
 };
 try { $("i-week").value = localStorage.getItem("per_week") || "2"; } catch (e) {}
 $("i-week").onchange = () => { try { localStorage.setItem("per_week", week()); } catch (e) {} loadTopics(); $("ap-week").value = week(); apSave({per_week: +week()}); };
-api("/admin/api/trends?per_week=" + week()).then(renderDemand).catch(() => {});
+api(BASE + "/api/trends?per_week=" + week()).then(renderDemand).catch(() => {});
 loadTopics();
 // ---------- SEO-автопилот
 let seo = null, seoPoll = null;
@@ -1236,7 +1238,7 @@ function kpi(label, now, was, better, fmt = fmtN) {
   return `<div class="kpi"><span>${label}</span><b>${fmt(now)}</b>${d}</div>`;
 }
 async function loadSeo() {
-  try { seo = await api("/admin/api/seo"); renderSeo(); }
+  try { seo = await api(BASE + "/api/seo"); renderSeo(); }
   catch (e) { $("seo-status").textContent = e.message; }
 }
 function renderSeo() {
@@ -1255,7 +1257,7 @@ function renderSeo() {
   $("seo-prompts").placeholder = seo.geo_prompts.join("\n");
   $("seo-auto").checked = !!seo.auto_apply;
   if (seo.running && !seoPoll) seoPoll = setInterval(loadSeo, 5000);
-  if (!seo.running && seoPoll) { clearInterval(seoPoll); seoPoll = null; api("/admin/api/tune").then(renderTune).catch(() => {}); }
+  if (!seo.running && seoPoll) { clearInterval(seoPoll); seoPoll = null; api(BASE + "/api/tune").then(renderTune).catch(() => {}); }
   const out = [];
   if (an) {
     const [c, p] = [an.totals.cur, an.totals.prev];
@@ -1290,12 +1292,12 @@ $("seo-body").onclick = e => {
   e.preventDefault(); open(articles.find(x => x.slug === a.dataset.open) || null);
 };
 $("seo-run").onclick = async () => {
-  try { seo = await api("/admin/api/seo/run", {method: "POST"}); renderSeo(); toast("Проверка запущена. Займёт 5–15 минут; отчёт придёт в Telegram и появится здесь."); }
+  try { seo = await api(BASE + "/api/seo/run", {method: "POST"}); renderSeo(); toast("Проверка запущена. Займёт 5–15 минут; отчёт придёт в Telegram и появится здесь."); }
   catch (e) { toast(e.message, true); }
 };
 $("seo-connect-open").onclick = e => { e.preventDefault(); $("seo-settings").open = true; $("seo-settings").scrollIntoView({behavior: "smooth"}); };
 async function seoSettings(body, okMsg) {
-  try { const d = await api("/admin/api/seo/settings", {method: "POST", body: JSON.stringify(body)}); seo = d; renderSeo(); toast(okMsg || d.message); }
+  try { const d = await api(BASE + "/api/seo/settings", {method: "POST", body: JSON.stringify(body)}); seo = d; renderSeo(); toast(okMsg || d.message); }
   catch (e) { toast(e.message, true); }
 }
 $("seo-key").onchange = async e => {
@@ -1305,7 +1307,7 @@ $("seo-key").onchange = async e => {
 };
 $("seo-check").onclick = async () => {
   const b = $("seo-check"); busy(b, true, "Проверяю…");
-  try { toast((await api("/admin/api/seo/gsc-check", {method: "POST"})).message); } catch (e) { toast(e.message, true); }
+  try { toast((await api(BASE + "/api/seo/gsc-check", {method: "POST"})).message); } catch (e) { toast(e.message, true); }
   busy(b, false);
 };
 $("seo-gsc-off").onclick = () => { if (confirm("Отключить Search Console? Ключ удалится с хостинга.")) seoSettings({gsc_remove: true}, "Search Console отключена"); };
@@ -1318,7 +1320,7 @@ async function showSettings() {
   dirty = false;
   document.body.classList.remove("view-edit"); document.body.classList.add("view-settings"); window.scrollTo(0, 0);
   try {
-    const s = await api("/admin/api/settings");
+    const s = await api(BASE + "/api/settings");
     $("s-ant-cur").textContent = s.anthropic_key ? `— сейчас ${s.anthropic_key}` : "— не задан";
     $("s-oai-cur").textContent = s.openai_key ? `— сейчас ${s.openai_key}` : "— не задан";
     $("s-spend-cur").textContent = s.spend_link ? `— подключено: ${s.spend_link}` : "— не подключено";
@@ -1329,27 +1331,27 @@ async function showSettings() {
 }
 async function tgStatus() {
   try {
-    const t = await api("/admin/api/telegram");
+    const t = await api(BASE + "/api/telegram");
     $("tg-status").textContent = !t.ready ? "Бот не настроен на хостинге." : t.group ? `Заявки приходят вам в личку и в группу «${t.title}».` : "Заявки приходят вам в личку. Можно добавить группу — тогда будут приходить и туда.";
     $("tg-unlink").classList.toggle("hidden", !t.group);
   } catch (e) { $("tg-status").textContent = e.message; }
 }
 $("tg-pin").onclick = async () => {
   const b = $("tg-pin"); busy(b, true, "Отправляю…");
-  try { await api("/admin/api/telegram/pin", {method: "POST"}); toast("PIN отправлен вам в Telegram. Добавьте бота в группу и напишите там /link PIN"); }
+  try { await api(BASE + "/api/telegram/pin", {method: "POST"}); toast("PIN отправлен вам в Telegram. Добавьте бота в группу и напишите там /link PIN"); }
   catch (e) { toast(e.message, true); }
   busy(b, false);
 };
 $("tg-unlink").onclick = async () => {
   if (!confirm("Отвязать группу? Заявки останутся у вас в личке.")) return;
-  try { await api("/admin/api/telegram/unlink", {method: "POST"}); toast("Группа отвязана — заявки только в личку"); tgStatus(); } catch (e) { toast(e.message, true); }
+  try { await api(BASE + "/api/telegram/unlink", {method: "POST"}); toast("Группа отвязана — заявки только в личку"); tgStatus(); } catch (e) { toast(e.message, true); }
 };
 $("b-settings").onclick = () => { showSettings(); tgStatus(); };
 $("keys-link").onclick = e => { e.preventDefault(); showSettings(); tgStatus(); };
 $("s-back").onclick = () => { document.body.classList.remove("view-settings"); checkKeys(); };
 $("s-model").onchange = async () => {
   try {
-    const d = await api("/admin/api/settings", {method: "POST", body: JSON.stringify({claude_model: $("s-model").value})});
+    const d = await api(BASE + "/api/settings", {method: "POST", body: JSON.stringify({claude_model: $("s-model").value})});
     toast(d.changed.length ? "Сохранено: " + d.changed.join(", ") : "Ничего не изменилось");
     $("model").textContent = "· " + $("s-model").value;
     $("g-model").value = $("s-model").value;
@@ -1358,7 +1360,7 @@ $("s-model").onchange = async () => {
 $("s-save").onclick = async () => {
   const b = $("s-save"); busy(b, true, "Сохраняю…");
   try {
-    const d = await api("/admin/api/settings", {method: "POST", body: JSON.stringify({
+    const d = await api(BASE + "/api/settings", {method: "POST", body: JSON.stringify({
       anthropic_key: $("s-ant").value, openai_key: $("s-oai").value, spend_link: $("s-spend").value,
       password_current: $("s-pass-cur").value, password_new: $("s-pass-new").value})});
     ["s-ant", "s-oai", "s-spend", "s-pass-cur", "s-pass-new"].forEach(id => { $(id).value = ""; });
@@ -1370,11 +1372,11 @@ $("s-save").onclick = async () => {
 $("b-logout").onclick = async () => {
   if (dirty && !confirm("Есть несохранённые изменения. Выйти?")) return;
   dirty = false;
-  await api("/admin/api/logout", {method: "POST"}).catch(() => {});
+  await api(BASE + "/api/logout", {method: "POST"}).catch(() => {});
   location.reload();
 };
 async function checkKeys() {
-  try { const s = await api("/admin/api/settings"); $("keys-warn").classList.toggle("hidden", !!(s.anthropic_key && s.openai_key)); } catch (e) {}
+  try { const s = await api(BASE + "/api/settings"); $("keys-warn").classList.toggle("hidden", !!(s.anthropic_key && s.openai_key)); } catch (e) {}
 }
 checkKeys();
 

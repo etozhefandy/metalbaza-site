@@ -16,7 +16,10 @@ const LOGIN_MAX_FAILS = 5;     // с одного IP за окно
 
 function client_ip(): string { return (string) ($_SERVER['REMOTE_ADDR'] ?? '?'); }
 
-function is_configured(): bool { return !empty(settings()['password_hash']); }
+// Пульт admin.alfimov.kz сам проверяет вход (код из Telegram) и только потом подключает админку сайта.
+function hub_authed(): bool { return defined('HUB_AUTHED') && HUB_AUTHED === true; }
+
+function is_configured(): bool { return hub_authed() || !empty(settings()['password_hash']); }
 
 function with_lock(string $name, callable $fn)
 {
@@ -35,6 +38,7 @@ function sessions_file(): string { return DATA_DIR . '/sessions.json'; }
 
 function current_session(): bool
 {
+    if (hub_authed()) return true;
     $token = (string) ($_COOKIE[SESSION_COOKIE] ?? '');
     if (strlen($token) !== 64) return false;
     $all = read_json(sessions_file()) ?? [];

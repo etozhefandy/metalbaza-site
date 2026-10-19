@@ -29,7 +29,10 @@ if (current_session() && is_configured()) {
     // подписи и примеры в интерфейсе — у каждого сайта свои (prompts.php → 'admin'), разделы — из сборки сайта
     $names = [];
     foreach (services() as $x) $names[$x['slug']] = $x['name'];
-    $vars = ['%%HOST%%' => SITE_HOST, '%%SERVICE_NAMES%%' => json_encode($names, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG)];
+    $vars = ['%%HOST%%' => SITE_HOST, '%%SERVICE_NAMES%%' => json_encode($names, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG),
+        // в пульте (admin.alfimov.kz) админка сайта открыта по адресу /s/<домен>/admin, картинки — с самого сайта
+        '%%ADMIN_BASE%%' => defined('HUB_ADMIN_BASE') ? HUB_ADMIN_BASE : '/admin',
+        '%%SITE_ORIGIN%%' => defined('HUB_ADMIN_BASE') ? SITE_URL : ''];
     foreach ((array) P('admin') as $k => $v) $vars['%%A_' . strtoupper((string) $k) . '%%'] = htmlspecialchars((string) $v, ENT_QUOTES, 'UTF-8');
     echo strtr((string) file_get_contents(dirname(__DIR__) . '/_blog/admin.tpl'), $vars);
     exit;
