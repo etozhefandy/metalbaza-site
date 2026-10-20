@@ -140,6 +140,7 @@
         .then(function (r) { return r.json().catch(function () { return { ok: false }; }); })
         .then(function (res) {
           if (!res.ok) throw new Error("send failed");
+          if (window.clarity) clarity("event", "lead");   // заявка — отметка в Clarity для фильтра записей
           form.reset();
           if (iti) iti.setNumber("");
           if (ts) ts.value = String(Date.now());

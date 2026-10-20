@@ -32,6 +32,15 @@ FONT_URL = (
     "https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Condensed:wght@600;700"
     "&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap"
 )
+# Microsoft Clarity — тепловые карты кликов и прокрутки, записи визитов (clarity.microsoft.com). Пусто — не ставится.
+# Поля ввода Clarity по умолчанию скрывает (телефоны в записи не попадают). Источники Clarity разрешены в CSP (static/.htaccess).
+CLARITY_ID = ""
+CLARITY_TAG = (
+    '<script>(function(c,l,a,r,i,t,y){c[a]=c[a]||function(){(c[a].q=c[a].q||[]).push(arguments)};'
+    't=l.createElement(r);t.async=1;t.src="https://www.clarity.ms/tag/"+i;y=l.getElementsByTagName(r)[0];'
+    f'y.parentNode.insertBefore(t,y)}})(window,document,"clarity","script","{CLARITY_ID}");</script>'
+) if CLARITY_ID else ""
+
 ASSET_VER = hashlib.md5(
     b"".join((STATIC / "assets" / f).read_bytes() for f in ("style.css", "main.js"))
 ).hexdigest()[:8]
@@ -283,6 +292,7 @@ def page(*, path, title, desc, body, schema, noindex=False, og_type="website", i
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
+{CLARITY_TAG}
 <title>{e(title)}</title>
 <meta name="description" content="{e(desc)}">
 {robots}
