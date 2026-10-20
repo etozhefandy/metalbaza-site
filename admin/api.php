@@ -14,6 +14,8 @@ header('X-Robots-Tag: noindex, nofollow');
 header('Cache-Control: no-store');
 
 const MAX_UPLOAD = 20 * 1024 * 1024;
+const MAX_BODY = 64 * 1024 * 1024;     // весь запрос (несколько скриншотов в base64) — больше не читаем
+
 const MEDIA_MAX_W = 1800;
 
 function reply($data, int $code = 200): void
@@ -28,7 +30,9 @@ function fail(string $msg, int $code = 400): void { reply(['error' => $msg], $co
 
 function body(): array
 {
-    $data = json_decode((string) file_get_contents('php://input'), true);
+    $raw = (string) file_get_contents('php://input', false, null, 0, MAX_BODY + 1);
+    if (strlen($raw) > MAX_BODY) fail('Слишком большой запрос — уменьшите картинки или отправьте их по одной', 413);
+    $data = json_decode($raw, true);
     return is_array($data) ? $data : [];
 }
 
@@ -52,6 +56,7 @@ function media_name(string $base, string $ext): string
 /** Картинка с телефона: уменьшаем до MEDIA_MAX_W по ширине и сохраняем в webp. */
 function store_upload(string $raw, string $stem): string
 {
+    image_size_ok($raw);
     $img = @imagecreatefromstring($raw);
     if (!$img) throw new InvalidArgumentException('Не удалось прочитать картинку — нужен jpg, png или webp');
     $w = imagesx($img);
@@ -114,6 +119,7 @@ function execute(array $job): array
 /** Скриншот источника → jpeg до 1568 px (больше Claude всё равно уменьшит) во временной папке задач. */
 function store_source_image(string $raw): string
 {
+    image_size_ok($raw);
     $img = @imagecreatefromstring($raw);
     if (!$img) throw new InvalidArgumentException('Скриншот не читается — нужен jpg, png или webp');
     $w = imagesx($img);

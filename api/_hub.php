@@ -87,9 +87,12 @@ function hub_tick_kick(?callable $fire = null, ?int $now = null): bool
     if (is_file($mon) && filemtime($mon) > $now - HUB_TICK_EVERY) return false;
     if (is_file($stamp) && filemtime($stamp) > $now - 600) return false;   // будим не чаще раза в 10 минут
     if (!is_dir($dir) || !@touch($stamp, $now)) return false;
-    if ($fire) { $fire(HUB_URL . '/?tick=1'); return true; }
+    $key = trim((string) @file_get_contents("$dir/tick.key"));   // ключ создаёт пульт; без него будить бесполезно
+    if ($key === '') return false;
+    if ($fire) { $fire(HUB_URL . '/?tick=1', $key); return true; }
     $ch = curl_init(HUB_URL . '/?tick=1');
-    curl_setopt_array($ch, [CURLOPT_NOBODY => true, CURLOPT_TIMEOUT_MS => 800, CURLOPT_NOSIGNAL => true, CURLOPT_RETURNTRANSFER => true]);
+    curl_setopt_array($ch, [CURLOPT_NOBODY => true, CURLOPT_TIMEOUT_MS => 800, CURLOPT_NOSIGNAL => true, CURLOPT_RETURNTRANSFER => true,
+        CURLOPT_HTTPHEADER => ['X-Pult-Tick: ' . $key]]);
     @curl_exec($ch);   // ответа не ждём: проверка (до минуты) идёт на стороне пульта
     return true;
 }

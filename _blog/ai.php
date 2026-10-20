@@ -2,6 +2,7 @@
 // ИИ для админки: статьи (Claude), картинки (OpenAI), идеи тем (подсказки Google/Яндекса → Claude).
 // Ключи хранятся в DATA_DIR/settings.json (вне сайта), вводятся на странице «Настройки».
 declare(strict_types=1);
+require_once dirname(__DIR__) . '/api/_net.php';
 require_once __DIR__ . '/lib.php';
 
 const CLAUDE_MODEL = 'claude-opus-5-5';   // по умолчанию; выбирается в «Настройках» админки
@@ -251,21 +252,13 @@ function source_prompt(array $source): string
     return implode("\n", $lines);
 }
 
-/** Только публичные адреса: сервер не должен ходить во внутреннюю сеть хостинга. */
-function public_url(string $url): bool
-{
-    $p = parse_url($url);
-    if (!in_array(strtolower($p['scheme'] ?? ''), ['http', 'https'], true) || empty($p['host'])) return false;
-    $ips = filter_var($p['host'], FILTER_VALIDATE_IP) ? [$p['host']] : (gethostbynamel($p['host']) ?: []);
-    foreach ($ips as $ip) {
-        if (!filter_var($ip, FILTER_VALIDATE_IP, FILTER_FLAG_NO_PRIV_RANGE | FILTER_FLAG_NO_RES_RANGE)) return false;
-    }
-    return (bool) $ips;
-}
+/** Только публичные адреса: сервер не должен ходить во внутреннюю сеть хостинга (проверка — api/_net.php). */
+function public_url(string $url): bool { return net_target($url, true) !== null; }
 
-function http_get(string $url, string $ua, int $max = 3_000_000): array
+function http_get(string $url, string $ua, int $max = 3_000_000, ?array $target = null): array
 {
     $ch = curl_init($url);
+    if ($target) net_pin($ch, $target);   // соединяемся ровно с проверенным адресом
     $buf = '';
     curl_setopt_array($ch, [
         CURLOPT_FOLLOWLOCATION => false, CURLOPT_TIMEOUT => 20, CURLOPT_CONNECTTIMEOUT => 8, CURLOPT_USERAGENT => $ua,
@@ -285,8 +278,9 @@ function http_get(string $url, string $ua, int $max = 3_000_000): array
 function fetch_page(string $url, string $ua): array
 {
     for ($hop = 0; $hop < 5; $hop++) {
-        if (!public_url($url)) throw new AiError('Ссылка не открывается: нужен обычный адрес сайта http(s)://…');
-        [$body, $info] = http_get($url, $ua);
+        $t = net_target($url, true);
+        if (!$t) throw new AiError('Ссылка не открывается: нужен обычный адрес сайта http(s)://…');
+        [$body, $info] = http_get($url, $ua, 3_000_000, $t);
         if ($info['code'] >= 300 && $info['code'] < 400 && $info['location']) { $url = $info['location']; continue; }
         if ($info['code'] !== 200 || $body === '') throw new AiError("Сайт по ссылке не отдал страницу (код {$info['code']}) — вставьте текст или скриншот");
         return [$body, $info['type'], $url];

@@ -20,18 +20,38 @@ function lead_phone(string $contact): ?array
     return ['+' . $digits, $digits];
 }
 
-/** Не больше $max заявок с одного IP за 10 минут. → true, если лимит превышен. */
-function lead_rate_limited(int $max = 5): bool
+/** Не больше $max заявок с одного IP за 10 минут на сайт (и $max*3 на все сайты хостинга вместе). → true, если лимит превышен.
+ *  Проверка и запись — под блокировкой файла: пачка параллельных запросов не проскочит лимит. IP — только REMOTE_ADDR
+ *  (заголовкам X-Forwarded-For не верим). Не удалось открыть счётчик — пишем в лог и пропускаем заявку: потерять клиента хуже. */
+function lead_rate_limited(int $max = 5, string $scope = ''): bool
 {
-    $ip = isset($_SERVER['REMOTE_ADDR']) ? $_SERVER['REMOTE_ADDR'] : 'unknown';
-    $rlFile = sys_get_temp_dir() . '/alfimov_rl_' . md5($ip);
+    $ip = (string) ($_SERVER['REMOTE_ADDR'] ?? 'unknown');
+    $scope = $scope !== '' ? $scope : strtolower((string) ($_SERVER['HTTP_HOST'] ?? ''));
+    $limits = [md5("site|$scope|$ip") => $max, md5("all|$ip") => $max * 3];
+    $dir = getenv('ALFIMOV_RL_DIR') ?: sys_get_temp_dir();
     $now = time();
-    $hits = array_filter(
-        is_file($rlFile) ? (array) json_decode((string) @file_get_contents($rlFile), true) : [],
-        function ($t) use ($now) { return $now - (int) $t < 600; }
-    );
-    if (count($hits) >= $max) return true;
-    $hits[] = $now;
-    @file_put_contents($rlFile, json_encode(array_values($hits)));
-    return false;
+    $handles = [];
+    try {
+        foreach ($limits as $key => $lim) {
+            $fh = @fopen("$dir/alfimov_rl_$key", 'c+');
+            if (!$fh || !flock($fh, LOCK_EX)) { error_log('lead_rate_limited: счётчик недоступен'); return false; }
+            $handles[$key] = $fh;
+        }
+        $hits = [];
+        foreach ($handles as $key => $fh) {
+            rewind($fh);
+            $hits[$key] = array_values(array_filter((array) json_decode((string) stream_get_contents($fh), true), fn($t) => $now - (int) $t < 600));
+            if (count($hits[$key]) >= $limits[$key]) return true;
+        }
+        foreach ($handles as $key => $fh) {
+            $hits[$key][] = $now;
+            ftruncate($fh, 0);
+            rewind($fh);
+            fwrite($fh, json_encode($hits[$key]));
+            fflush($fh);
+        }
+        return false;
+    } finally {
+        foreach ($handles as $fh) { flock($fh, LOCK_UN); fclose($fh); }
+    }
 }

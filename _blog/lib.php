@@ -700,3 +700,19 @@ function indexnow_article(array $a, ?callable $send = null): bool
     return $code >= 200 && $code < 300;
 }
 
+// ---------------------------------------------------------------- картинки из админки
+
+const MAX_PIXELS = 25_000_000;   // ~5000×5000: столько GD распакует в пределах памяти PHP (memory_limit 256M)
+const MAX_SIDE = 12000;
+
+/** Размеры картинки — до распаковки: маленький файл может распаковаться в гигабайты (картинка-бомба). */
+function image_size_ok(string $raw): void
+{
+    $info = @getimagesizefromstring($raw);
+    if (!$info || !in_array($info[2], [IMAGETYPE_JPEG, IMAGETYPE_PNG, IMAGETYPE_WEBP, IMAGETYPE_GIF], true)) {
+        throw new InvalidArgumentException('Не удалось прочитать картинку — нужен jpg, png или webp');
+    }
+    if ($info[0] > MAX_SIDE || $info[1] > MAX_SIDE || $info[0] * $info[1] > MAX_PIXELS) {
+        throw new InvalidArgumentException("Картинка слишком большая ({$info[0]}×{$info[1]}) — уменьшите до 5000×5000 пикселей");
+    }
+}

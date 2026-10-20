@@ -7,6 +7,7 @@
 //
 // Сбой CRM никогда не теряет заявку: в Telegram она уже ушла, а здесь ошибка пишется в журнал hub-data/crm-log.json.
 declare(strict_types=1);
+require_once __DIR__ . '/_net.php';
 
 const CRM_TYPES = ['kommo' => 'Kommo', 'amocrm' => 'amoCRM', 'bitrix24' => 'Bitrix24', 'webhook' => 'Вебхук (любая CRM)'];
 
@@ -65,14 +66,18 @@ function crm_url_ok(string $u): bool
 {
     $p = parse_url($u);
     if (!$p || ($p['scheme'] ?? '') !== 'https' || empty($p['host']) || isset($p['user'])) return false;
-    return str_contains($p['host'], '.') && !filter_var($p['host'], FILTER_VALIDATE_IP) && !preg_match('/\.(local|internal|localhost)$/', $p['host']);
+    if (!str_contains($p['host'], '.') || filter_var($p['host'], FILTER_VALIDATE_IP) || preg_match('/\.(local|internal|localhost)$/', $p['host'])) return false;
+    return isset($GLOBALS['CRM_HTTP']) || net_target($u) !== null;   // имя ведёт только на публичные адреса
 }
 
 /** → [код ответа (0 — нет связи), разобранный JSON|null, текст ошибки]. В тестах подменяется $GLOBALS['CRM_HTTP']. */
 function crm_http(string $method, string $url, array $headers = [], ?array $json = null): array
 {
     if (isset($GLOBALS['CRM_HTTP'])) return $GLOBALS['CRM_HTTP']($method, $url, $headers, $json);
+    $t = net_target($url);   // только https на публичный адрес, соединение — с проверенным IP
+    if (!$t) return [0, null, 'адрес ведёт не в интернет (внутренняя сеть или не https)'];
     $ch = curl_init($url);
+    net_pin($ch, $t);
     curl_setopt_array($ch, [CURLOPT_CUSTOMREQUEST => $method, CURLOPT_RETURNTRANSFER => true, CURLOPT_TIMEOUT => 12,
         CURLOPT_CONNECTTIMEOUT => 6, CURLOPT_FOLLOWLOCATION => false, CURLOPT_USERAGENT => 'alfimov-pult-crm',
         CURLOPT_HTTPHEADER => array_merge(['Accept: application/json'], $headers)]);

@@ -82,31 +82,50 @@ function login_blocked(): bool
     return count($recent) >= LOGIN_MAX_FAILS;
 }
 
+function prune_fails(array $fails): array
+{
+    foreach ($fails as $ip => $ts) {
+        $fails[$ip] = array_values(array_filter((array) $ts, fn($t) => $t > time() - LOGIN_WINDOW));
+        if (!$fails[$ip]) unset($fails[$ip]);
+    }
+    return $fails;
+}
+
 function note_login_fail(): void
 {
     with_lock('fails', function () {
-        $fails = read_json(fails_file()) ?? [];
-        foreach ($fails as $ip => $ts) {
-            $fails[$ip] = array_values(array_filter($ts, fn($t) => $t > time() - LOGIN_WINDOW));
-            if (!$fails[$ip]) unset($fails[$ip]);
-        }
+        $fails = prune_fails(read_json(fails_file()) ?? []);
         $fails[client_ip()][] = time();
         write_json(fails_file(), $fails);
     });
 }
 
-/** → текст ошибки или '' при успехе. */
+/** → текст ошибки или '' при успехе. Попытка «бронируется» под блокировкой до проверки пароля: параллельные запросы
+ *  не проскочат лимит, проверив один и тот же остаток. Верный пароль бронь снимает. */
 function try_login(string $login, string $password): string
 {
-    if (login_blocked()) return 'Слишком много попыток. Подождите 15 минут.';
+    $stamp = microtime(true);
+    $ok = with_lock('fails', function () use ($stamp) {
+        $fails = prune_fails(read_json(fails_file()) ?? []);
+        if (count($fails[client_ip()] ?? []) >= LOGIN_MAX_FAILS) return false;
+        $fails[client_ip()][] = $stamp;
+        write_json(fails_file(), $fails);
+        return true;
+    });
+    if (!$ok) return 'Слишком много попыток. Подождите 15 минут.';
     $s = settings();
     $ok = hash_equals(mb_strtolower((string) ($s['login'] ?? '')), mb_strtolower(trim($login)))
         && password_verify($password, (string) ($s['password_hash'] ?? ''));
     if (!$ok) {
-        note_login_fail();
         usleep(400000);
         return 'Неверный логин или пароль';
     }
+    with_lock('fails', function () use ($stamp) {   // вошли — бронь не считается ошибкой
+        $fails = read_json(fails_file()) ?? [];
+        $fails[client_ip()] = array_values(array_filter((array) ($fails[client_ip()] ?? []), fn($t) => $t != $stamp));
+        if (!$fails[client_ip()]) unset($fails[client_ip()]);
+        write_json(fails_file(), $fails);
+    });
     start_session();
     return '';
 }
