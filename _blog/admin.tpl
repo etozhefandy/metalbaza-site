@@ -674,7 +674,8 @@ function renderQueue(d) {
   $("q-buffer-status").textContent = d.autopilot
     ? `Запас: ${d.ready} из ${d.buffer_target} готово` + (d.refilling ? " · пополняет" : d.ready >= d.buffer_target ? " · запас полный" : "")
     : "";
-  const items = d.items.filter(it => it.stage !== "cancelled").slice(0, 8);
+  // ближайшая дата выхода — сверху; у ещё не готовых даты нет, их показываем первыми (над ними уже идёт работа)
+  const items = d.items.filter(it => it.stage !== "cancelled").sort((a, b) => (a.publish_at || "").localeCompare(b.publish_at || "")).slice(0, 8);
   $("q-list").innerHTML = items.map(it => `<li class="${it.stage}"><b>${esc(it.title || it.topic || (it.origin === "auto" ? "Автопилот подбирает тему" : "Статья по источнику"))}</b>
     <span class="st">${esc(qStatus(it))}</span>${it.model ? `<span class="hint">${it.model.includes("sonnet") ? "Sonnet" : "Opus"}</span>` : ""}${it.origin !== "manual" ? `<span class="hint">${it.origin === "auto" ? "🤖" : "☑︎"}</span>` : ""}
     ${it.stage === "done" ? `<button class="btn" data-qopen="${esc(it.slug)}">Открыть</button>` : ""}
