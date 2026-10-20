@@ -3,7 +3,13 @@
 // сервер не должен ходить во внутреннюю сеть хостинга (SSRF). Проверяем все адреса имени (A и AAAA) и соединяемся
 // ровно с проверенным IP (CURLOPT_RESOLVE) — подменить DNS между проверкой и соединением не выйдет. Редиректы не
 // следуем: кому нужно — обрабатывает вручную, проверяя каждый шаг через net_target().
+//
+// Пульт в одном процессе подключает и свою копию этого файла, и копию сайта (admin сайта выполняется внутри
+// пульта — hub/pult.php: pult_site_admin). Это два разных файла на диске с одинаковыми функциями, поэтому всё
+// объявляем только при первой загрузке — иначе на двух сайтах сразу admin.alfimov.kz падал «Cannot redeclare».
 declare(strict_types=1);
+
+if (!function_exists('net_ip_public')) {
 
 /** Публичный ли адрес: не loopback, не частная сеть, не link-local, не служебные и не multicast (IPv4 и IPv6, в т. ч. ::ffff:a.b.c.d). */
 function net_ip_public(string $ip): bool
@@ -76,4 +82,6 @@ function net_pin($ch, array $t): void
     $ip = str_contains($t['ip'], ':') ? '[' . $t['ip'] . ']' : $t['ip'];
     curl_setopt_array($ch, [CURLOPT_RESOLVE => ["{$t['host']}:{$t['port']}:$ip"], CURLOPT_FOLLOWLOCATION => false,
         CURLOPT_PROTOCOLS => CURLPROTO_HTTPS | CURLPROTO_HTTP]);
+}
+
 }
