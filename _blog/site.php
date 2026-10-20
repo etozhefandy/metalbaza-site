@@ -6,6 +6,7 @@ if (!defined('SITE_TG_HUB_UP')) define('SITE_TG_HUB_UP', 1);
 if (!defined('SITE_LEAD_NAME')) define('SITE_LEAD_NAME', false);
 if (!defined('SITE_LEAD_CONSENT')) define('SITE_LEAD_CONSENT', true);
 if (!defined('NICHE_AUTHOR')) define('NICHE_AUTHOR', 'редакция Металбазы');
+if (!defined('SITE_CLARITY')) define('SITE_CLARITY', 'z0hfr76pkp');
 if (!defined('SITE_HOST')) define('SITE_HOST', 'metalbaza.kz');
 if (!defined('SITE_URL')) define('SITE_URL', 'https://metalbaza.kz');
 if (!defined('SITE_BRAND')) define('SITE_BRAND', 'Металбаза');
