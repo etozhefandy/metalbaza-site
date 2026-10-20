@@ -725,8 +725,16 @@ function tune_articles(array $queries, array $pages, ?callable $post = null, str
             'faq' => array_values(array_filter($t['faq'] ?? [], fn($x) => trim($x['q'] ?? '') !== '' && trim($x['a'] ?? '') !== ''))];
     }
     $topics = $data['new_topics'] ?? [];
-    if ($topics) { topics_add($topics, 'из Search Console'); if ($dedupe) topics_dedupe($post); }
-    $result = ['articles' => $out, 'new_topics' => count($topics), 'queries' => count($queries), 'created' => now()->format('Y-m-d H:i')];
+    $proposed = [];
+    if ($topics) {
+        $added = topics_add($topics, 'из Search Console');
+        if ($dedupe) topics_dedupe($post);
+        // после проверки на повторы часть добавленных могла уйти в «отклонённые» — предлагаем написать только то, что реально осталось новым
+        $ids = array_column($added, 'id');
+        $byId = $ids ? array_column(topics_load(), null, 'id') : [];
+        $proposed = array_values(array_filter(array_map(fn($id) => $byId[$id] ?? null, $ids), fn($t) => $t && $t['status'] === 'new'));
+    }
+    $result = ['articles' => $out, 'new_topics' => $proposed, 'queries' => count($queries), 'created' => now()->format('Y-m-d H:i')];
     write_json(DATA_DIR . '/tune.json', $result);
     return $result;
 }
@@ -868,8 +876,9 @@ function topic_key(array $i): string
     return mb_strtolower(trim((string) ($i['main_keyword'] ?? ''))) . '|' . mb_strtolower(trim((string) ($i['topic'] ?? '')));
 }
 
-/** Новые темы — в начало списка; повторы (тот же ключ и заголовок или тот же главный запрос) пропускаются. */
-function topics_merge(array $list, array $ideas, string $source, string $created = ''): array
+/** Новые темы — в начало списка; повторы (тот же ключ и заголовок или тот же главный запрос) пропускаются.
+ *  $added — сюда (если передали) кладём только реально добавленные темы, с их id — пригодится вызывающему. */
+function topics_merge(array $list, array $ideas, string $source, string $created = '', ?array &$added = null): array
 {
     $seen = [];
     foreach ($list as $t) { $seen[topic_key($t)] = 1; $seen['k|' . mb_strtolower(trim($t['main_keyword']))] = 1; }
@@ -885,12 +894,18 @@ function topics_merge(array $list, array $ideas, string $source, string $created
             'service' => (string) ($i['service'] ?? ''), 'why' => (string) ($i['why'] ?? ''), 'source' => $source,
             'created' => $created ?: now()->format('Y-m-d H:i'), 'status' => 'new'];
     }
+    $added = $new;
     return array_merge($new, $list);
 }
 
-function topics_add(array $ideas, string $source): void
+/** → реально добавленные темы (без повторов), с их id. */
+function topics_add(array $ideas, string $source): array
 {
-    with_topics_lock(fn() => write_json(topics_file(), topics_merge(topics_load(), $ideas, $source)));
+    $added = [];
+    with_topics_lock(function () use ($ideas, $source, &$added) {
+        write_json(topics_file(), topics_merge(topics_load(), $ideas, $source, '', $added));
+    });
+    return $added;
 }
 
 function topics_set_status(string $id, string $status): bool

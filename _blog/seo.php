@@ -607,7 +607,7 @@ function seo_tune(): array
     if (!live_articles()) return ['articles' => 0, 'note' => 'нет вышедших статей'];
     $t = tune_articles($an['queries'], $an['pages'], null, tune_notes($an), false);
     $applied = seo_settings()['auto_apply'] ? tune_apply_all() : 0;
-    return ['articles' => count($t['articles']), 'new_topics' => $t['new_topics'], 'applied' => $applied];
+    return ['articles' => count($t['articles']), 'new_topics' => count($t['new_topics']), 'applied' => $applied];
 }
 
 /** Применить все предложенные и ещё не применённые правки (кнопка в Telegram или автоприменение). */

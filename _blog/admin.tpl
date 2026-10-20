@@ -1034,12 +1034,18 @@ document.addEventListener("change", e => {
 });
 document.addEventListener("click", async e => {
   if (e.target.id === "t-bulk-all") { e.preventDefault(); topics.filter(t => topicState(t) === "new").forEach(t => picked.add(t.id)); renderTopics(); return; }
-  if (e.target.id !== "t-bulk-go") return;
-  const b = e.target; busy(b, true, "Ставлю в очередь…");
+  const writeBtn = e.target.closest("[data-write-topics]");
+  if (e.target.id !== "t-bulk-go" && !writeBtn) return;
+  // «Написать выбранные» в «Темах статей» (picked) и «Написать отмеченные» в разборе запросов (свои галочки рядом с кнопкой) —
+  // одна и та же постановка в очередь, разница только в том, откуда берём список id.
+  const ids = writeBtn ? [...writeBtn.closest(".tu-topics").querySelectorAll(".tu-pick:checked")].map(c => c.dataset.id) : [...picked];
+  if (!ids.length) { toast("Отметьте хотя бы одну тему", true); return; }
+  const b = writeBtn || e.target; busy(b, true, "Ставлю в очередь…");
   try {
-    const d = await api(BASE + "/api/queue/topics", {method: "POST", body: JSON.stringify({ids: [...picked], words: $("g-words").value, model: $("g-model").value})});
+    const d = await api(BASE + "/api/queue/topics", {method: "POST", body: JSON.stringify({ids, words: $("g-words").value, model: $("g-model").value})});
     d.items.slice(0, d.added).forEach(it => { qMine.add(it.id); qSeen[it.id] = it.stage; });
-    picked.clear(); renderQueue(d); renderTopics();
+    if (!writeBtn) picked.clear();
+    renderQueue(d); loadTopics().catch(() => {});
     toast(`В очереди статей: ${d.added}. Пишутся по очереди на сервере, страницу можно закрыть.`);
     document.getElementById("q-card").scrollIntoView({behavior: "smooth", block: "start"});
   } catch (err) { toast(err.message, true); busy(b, false); }
@@ -1143,13 +1149,28 @@ $("tu-file").onchange = async e => {
   } catch (err) { $("tu-status").textContent = ""; toast(err.message, true); }
 };
 let tune = null;
+// Темы, которым не подошла ни одна статья (tune_articles вернул их уже сохранёнными в «Темах статей»): предлагаем
+// поставить в очередь прямо тут, галочками — так же, как в «Темах статей», но без перехода туда.
+function renderTuneTopics(topics) {
+  if (!topics || !topics.length) return "";
+  return `<div class="tu-topics" style="margin-top:16px"><h4 style="margin:0 0 4px">Новые темы из этих запросов (${topics.length})</h4>
+    <p class="hint" style="margin:0 0 10px">Ни одной вышедшей статье не подошли — можно сразу поставить по ним новые. Они уже и в «Темах статей» ниже.</p>
+    <ul class="ideas">${topics.map(t => `<li class="idea">
+      <input type="checkbox" class="pick tu-pick" data-id="${esc(t.id)}" checked title="Отметить для «Написать отмеченные»">
+      <div style="flex:1"><b>${esc(t.topic)}</b>
+        <div class="hint">🔑 ${esc(t.main_keyword)}${t.service ? " · → " + esc(SERVICE_NAMES[t.service] || t.service) : ""}</div>
+        <div class="hint">${esc(t.why)}</div>
+        <div class="hint">Запросы: ${esc(t.keywords.join(", "))}</div></div></li>`).join("")}</ul>
+    <div class="row" style="margin-top:10px"><button class="btn btn-p" data-write-topics>Написать отмеченные</button>
+      <span class="hint">— каждая встанет на свой свободный день, с обложкой</span></div></div>`;
+}
 function renderTune(d) {
   tune = d;
   if (!d || !d.articles) return;
   const pending = d.articles.filter(a => !a.applied).length;
   $("seo-tune").innerHTML = "";
-  $("tu-status").textContent = d.created ? `Разбор от ${d.created}: ${d.queries} запросов · статей к доработке: ${d.articles.length}` + (d.new_topics ? ` · новых тем в «Темах статей»: ${d.new_topics}` : "") : "";
-  $("tu-result").innerHTML = d.articles.length ? d.articles.map((a, i) => {
+  $("tu-status").textContent = d.created ? `Разбор от ${d.created}: ${d.queries} запросов · статей к доработке: ${d.articles.length}` + (d.new_topics.length ? ` · новых тем: ${d.new_topics.length}` : "") : "";
+  $("tu-result").innerHTML = (d.articles.length ? d.articles.map((a, i) => {
     const ch = [];
     if (a.seo_title) ch.push(`<label class="ch"><input type="checkbox" data-k="seo_title" checked><span><b>SEO title:</b> <span class="old">${esc(a.old.seo_title)}</span> → ${esc(a.seo_title)} <small class="cnt">${a.seo_title.length} симв.</small></span></label>`);
     if (a.description) ch.push(`<label class="ch"><input type="checkbox" data-k="description" checked><span><b>Описание:</b> ${esc(a.description)}</span></label>`);
@@ -1159,8 +1180,8 @@ function renderTune(d) {
     return `<div class="tu-card${a.applied ? " done" : ""}" data-i="${i}"><h4><a href="${esc(a.path)}" target="_blank">${esc(a.title)}</a></h4>
       <p class="why">${esc(a.why)}</p><div class="hint">Запросы: ${esc(a.queries.slice(0, 12).join(", "))}</div>${ch.join("")}
       <div class="row" style="margin-top:10px"><span class="spacer"></span>${a.applied ? `<button class="btn" disabled>✓ Применено</button>` : `<button class="btn btn-p" data-apply="${i}">Применить выбранное</button>`}</div></div>`;
-  }).join("") : `<p class="empty">Подтягивать пока нечего — статьи ещё далеко от первой страницы. Попробуйте выгрузку за 3 месяца через пару недель.</p>`;
-  $("seo-tune").innerHTML = d.articles.length ? $("tu-result").innerHTML : `<p class="empty" style="padding:0">Пока нет — появятся после проверки с подключённой Search Console.</p>`;
+  }).join("") : `<p class="empty">Подтягивать пока нечего — статьи ещё далеко от первой страницы. Попробуйте выгрузку за 3 месяца через пару недель.</p>`) + renderTuneTopics(d.new_topics);
+  $("seo-tune").innerHTML = (d.articles.length || d.new_topics.length) ? $("tu-result").innerHTML : `<p class="empty" style="padding:0">Пока нет — появятся после проверки с подключённой Search Console.</p>`;
   $("seo-apply-all").classList.toggle("hidden", !pending);
   $("seo-apply-all").textContent = `Применить всё (${pending})`;
   $("seo-tune-sec").querySelector(".hint").textContent = pending ? ` · ждут применения: ${pending}` : " · по данным Search Console; применяете по галочкам (или кнопкой в Telegram)";
