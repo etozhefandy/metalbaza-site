@@ -20,6 +20,10 @@ ErrorDocument 404 /404.html
   # отказы доступа попадают в лог ошибок, и fail2ban хостинга банит IP (так забанило нас самих).
   RewriteCond %{THE_REQUEST} \s/+_blog/ [NC]
   RewriteRule ^ - [R=404,L]
+  # то же для закодированных адресов (/%5Fblog/…): проверяем уже раскодированный путь, но только у запроса снаружи —
+  # внутренние переходы на _blog/router.php (правила ниже) идут с REDIRECT_STATUS и не задеваются
+  RewriteCond %{ENV:REDIRECT_STATUS} ^$
+  RewriteRule ^_blog/ - [R=404,L]
   RewriteRule ^api/(_|config\.php) - [R=404,L]
   RewriteRule ^blog$ /blog/ [L,R=301]
   RewriteRule ^blog/([a-z0-9-]+)$ /blog/$1/ [L,R=301]
