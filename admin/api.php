@@ -273,6 +273,11 @@ try {
         if (array_key_exists('on', $d)) $s['autopost'] = (bool) $d['on'];
         if (isset($d['per_week']) && isset(SLOT_DAYS[(int) $d['per_week']])) $s['per_week'] = (int) $d['per_week'];
         if (isset($d['image_mode']) && in_array($d['image_mode'], IMG_MODES, true)) $s['image_mode'] = $d['image_mode'];
+        if (isset($d['buffer_target'])) {
+            $t = (int) $d['buffer_target'];
+            if ($t < BUFFER_TARGET_MIN || $t > BUFFER_TARGET_MAX) fail("Запас — от " . BUFFER_TARGET_MIN . " до " . BUFFER_TARGET_MAX . " статей");
+            $s['buffer_target'] = $t;
+        }
         save_settings($s);
         if (!empty($d['on'])) { $q = queue_state(); $q['checked'] = 0; queue_save($q); queue_maybe_kick(); }
         reply(queue_view());

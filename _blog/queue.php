@@ -9,8 +9,12 @@
 // запрос делает одну задачу и запускает следующие. Одновременно — один текст и одна обложка. Оборванная задача
 // повторяется (2 попытки). Cron не нужен: заходы на сайт и админка «пинают» очередь.
 //
-// Автопилот — тумблер поверх очереди: когда в плане на ближайшую неделю есть свободный день, он сам добавляет
-// статью (тему берёт из списка тем, а если он пуст — подбирает по спросу Google и Яндекса).
+// Автопилот — тумблер поверх очереди: держит запас готовых статей (текст + обложка, ждут своего дня по ритму
+// выхода). Запас — не «подливаем по одной на каждый чих»: пока его хватает (выше низкой отметки, ¼ от цели),
+// автопилот молчит; просел до низкой — пишет пачкой, пока не наберёт полный запас снова (но не быстрее
+// AUTOPILOT_MAX_PER_DAY в день — это и есть «подстраивается под темп», большой недобор не пишется за один присест).
+// Ритм выхода (per_week) этим не затрагивается: он только расставляет готовые статьи по дням, запас может
+// растянуться на много недель вперёд.
 declare(strict_types=1);
 require_once __DIR__ . '/ai.php';
 require_once dirname(__DIR__) . '/api/_tg.php';
@@ -19,6 +23,9 @@ const QUEUE_LEASE = 330;            // задача дольше этого — 
 const QUEUE_KICK_EVERY = 20;        // не чаще — повторный пинок очереди
 const AUTOPILOT_CHECK_EVERY = 600;  // как часто заходы на сайт проверяют план для автопилота
 const AUTOPILOT_MAX_PER_DAY = 3;    // страховка от расходов при сбоях
+const BUFFER_TARGET_DEFAULT = 12;   // сколько готовых статей держать про запас, если не меняли в настройках
+const BUFFER_TARGET_MIN = 3;
+const BUFFER_TARGET_MAX = 60;
 const QUEUE_KEEP = 30;              // сколько готовых записей помнить для админки
 
 function queue_file(): string { return DATA_DIR . '/queue.json'; }
@@ -41,14 +48,17 @@ function queue_locked(callable $fn)
     }
 }
 
-/** Настройки из админки: автопилот (по умолчанию выключен), ритм выхода, сюжет обложки (по умолчанию — с людьми). */
+/** Настройки из админки: автопилот (по умолчанию выключен), ритм выхода, сюжет обложки (по умолчанию — с людьми),
+ *  запас готовых статей (по умолчанию 12). */
 function queue_settings(): array
 {
     $s = settings();
     $week = (int) ($s['per_week'] ?? 2);
     $mode = (string) ($s['image_mode'] ?? 'people');
+    $target = (int) ($s['buffer_target'] ?? BUFFER_TARGET_DEFAULT);
     return ['autopilot' => !empty($s['autopost']), 'per_week' => isset(SLOT_DAYS[$week]) ? $week : 2,
         'image_mode' => in_array($mode, IMG_MODES, true) ? $mode : 'people',
+        'buffer_target' => $target >= BUFFER_TARGET_MIN && $target <= BUFFER_TARGET_MAX ? $target : BUFFER_TARGET_DEFAULT,
         'ready' => trim((string) ($s['anthropic_key'] ?? '')) !== '' && trim((string) ($s['openai_key'] ?? '')) !== ''];
 }
 
@@ -360,14 +370,26 @@ function queue_notify(array $a, bool $cover): void
 
 // ---------------------------------------------------------------- пинки и автопилот
 
-/** Есть ли свободное место в плане: в ближайшие 7 дней статей меньше, чем дней выхода по ритму. */
-function autopilot_due(?DateTimeImmutable $at = null): bool
+/** Сколько статей по-настоящему готовы ждать своего дня: запланированные, с текстом и обложкой. Без обложки —
+ *  такое бывает, если OpenAI подвёл (queue_finish всё равно её публикует), но «про запас» это не считаем. */
+function autopilot_ready_count(?DateTimeImmutable $at = null): int
 {
     $at ??= now();
-    $end = $at->modify('+7 days');
-    $soon = array_filter(load_all(), fn($a) => state($a, $at) === 'scheduled' && ($dt = parse_dt($a['publish_at'])) && $dt <= $end);
-    $pending = count(array_filter(queue_state()['items'] ?? [], 'queue_open'));
-    return count($soon) + $pending < count(SLOT_DAYS[queue_settings()['per_week']]);
+    return count(array_filter(load_all(), fn($a) => state($a, $at) === 'scheduled' && $a['cover_path'] !== ''));
+}
+
+/** Нужна ли ещё статья и остаёмся ли «в пополнении» (гистерезис, чтобы не подливать по одной на каждый чих):
+ *  просел запас (готовые + уже пишутся) до низкой отметки — пополняем пачкой, пока не наберём цель снова; между
+ *  низкой отметкой и целью автопилот молчит. $refilling — текущий флаг (queue_state()['buffer_refill']).
+ *  → [нужна статья сейчас?, новое значение флага]. */
+function autopilot_due(bool $refilling, ?DateTimeImmutable $at = null): array
+{
+    $target = queue_settings()['buffer_target'];
+    $low = max(1, (int) round($target / 4));
+    $total = autopilot_ready_count($at) + count(array_filter(queue_state()['items'] ?? [], 'queue_open'));
+    if (!$refilling && $total <= $low) $refilling = true;
+    if ($refilling && $total >= $target) $refilling = false;
+    return [$refilling && $total < $target, $refilling];
 }
 
 /** С заходов на сайт и из админки: продолжить очередь, а раз в 10 минут — проверить, не нужна ли статья автопилоту. */
@@ -381,7 +403,9 @@ function queue_maybe_kick(?callable $fire = null, ?int $now = null): void
             $s['checked'] = $now;
             $cfg = queue_settings();
             $today = array_values(array_filter((array) ($s['auto_started'] ?? []), fn($t) => $now - (int) $t < 86400));
-            $ok = $cfg['autopilot'] && $cfg['ready'] && count($today) < AUTOPILOT_MAX_PER_DAY && autopilot_due();
+            [$due, $refilling] = autopilot_due(!empty($s['buffer_refill']));
+            $s['buffer_refill'] = $refilling;
+            $ok = $cfg['autopilot'] && $cfg['ready'] && count($today) < AUTOPILOT_MAX_PER_DAY && $due;
             if ($ok) $s['auto_started'] = [...$today, $now];
             queue_save($s);
             return $ok;
@@ -393,10 +417,11 @@ function queue_maybe_kick(?callable $fire = null, ?int $now = null): void
     queue_fire_free($fire);
 }
 
-/** Для админки: очередь (новые сверху) и настройки. */
+/** Для админки: очередь (новые сверху), настройки и запас (сколько готово из скольких держим целью). */
 function queue_view(): array
 {
     $items = array_reverse(queue_state()['items'] ?? []);
-    return queue_settings() + ['items' => array_slice($items, 0, 20), 'due' => autopilot_due(),
-        'pending' => count(array_filter($items, 'queue_open'))];
+    $pending = count(array_filter($items, 'queue_open'));
+    return queue_settings() + ['items' => array_slice($items, 0, 20), 'pending' => $pending,
+        'ready' => autopilot_ready_count(), 'refilling' => !empty(queue_state()['buffer_refill'])];
 }

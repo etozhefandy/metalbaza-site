@@ -344,12 +344,14 @@ body:not(.view-edit) .mbar { display: none !important; }
       <div class="row" style="gap:10px;flex-wrap:wrap">
         <h2 style="margin:0">🧾 Очередь написания <small id="q-count"></small></h2>
         <span class="spacer"></span>
-        <label class="f inline" title="Сам пишет статьи с обложками, когда в плане на неделю есть свободный день"><input type="checkbox" id="ap-on"> 🤖 Автопилот</label>
+        <label class="f inline" title="Сам пишет статьи с обложками, пока не наберёт запас на будущее"><input type="checkbox" id="ap-on"> 🤖 Автопилот</label>
         <label class="f inline">Ритм<select id="ap-week"><option value="1">1 в неделю (вт)</option><option value="2">2 в неделю (вт, чт)</option><option value="3">3 в неделю (пн, ср, пт)</option></select></label>
         <label class="f inline">Обложка<select id="ap-mode"><option value="people">с людьми</option><option value="auto">авто</option><option value="abstract">без людей</option></select></label>
+        <label class="f inline" title="Сколько готовых статей (текст и обложка, ждут своего дня) держать про запас"><input type="number" id="ap-buffer" min="3" max="60" step="1" style="width:64px"> про запас</label>
       </div>
+      <p class="hint" id="q-buffer-status" style="margin:8px 0 0"></p>
       <ul class="qlist" id="q-list"></ul>
-      <p class="hint" id="q-hint" style="margin:8px 0 0">Сюда попадает каждая статья, которую вы отправили писать: текст и обложка готовятся одновременно на сервере (страницу можно закрыть), затем статья сама встаёт на ближайший свободный день по ритму, 10:00. Автопилот делает то же сам, когда на неделе есть свободный день.</p>
+      <p class="hint" id="q-hint" style="margin:8px 0 0">Сюда попадает каждая статья, которую вы отправили писать: текст и обложка готовятся одновременно на сервере (страницу можно закрыть), затем статья сама встаёт на ближайший свободный день по ритму, 10:00. Автопилот держит запас готовых статей: просел до ¼ от цели — дописывает пачкой (не быстрее нескольких в день), пока не наберёт полный запас снова.</p>
     </section>
     <section class="card" id="list-card">
       <div class="row" style="margin-bottom:14px">
@@ -667,7 +669,11 @@ function qStatus(it) {
 }
 function renderQueue(d) {
   $("ap-on").checked = d.autopilot; $("ap-week").value = String(d.per_week); $("ap-mode").value = d.image_mode;
+  if (document.activeElement !== $("ap-buffer")) $("ap-buffer").value = d.buffer_target;
   $("q-count").textContent = d.pending ? `· пишется ${d.pending}` : "";
+  $("q-buffer-status").textContent = d.autopilot
+    ? `Запас: ${d.ready} из ${d.buffer_target} готово` + (d.refilling ? " · пополняет" : d.ready >= d.buffer_target ? " · запас полный" : "")
+    : "";
   const items = d.items.filter(it => it.stage !== "cancelled").slice(0, 8);
   $("q-list").innerHTML = items.map(it => `<li class="${it.stage}"><b>${esc(it.title || it.topic || (it.origin === "auto" ? "Автопилот подбирает тему" : "Статья по источнику"))}</b>
     <span class="st">${esc(qStatus(it))}</span>${it.model ? `<span class="hint">${it.model.includes("sonnet") ? "Sonnet" : "Opus"}</span>` : ""}${it.origin !== "manual" ? `<span class="hint">${it.origin === "auto" ? "🤖" : "☑︎"}</span>` : ""}
@@ -706,9 +712,13 @@ $("q-list").onclick = async e => {
   if (c) { try { renderQueue(await api(`${BASE}/api/queue/${c.dataset.qcancel}/cancel`, {method: "POST"})); } catch (err) { toast(err.message, true); } }
 };
 const apSave = body => api(BASE + "/api/autopilot", {method: "POST", body: JSON.stringify(body)}).then(renderQueue).catch(e => toast(e.message, true));
-$("ap-on").onchange = () => { apSave({on: $("ap-on").checked}); toast($("ap-on").checked ? "Автопилот включён: когда в плане на неделю есть свободный день, он сам напишет статью с обложкой" : "Автопилот выключен"); };
+$("ap-on").onchange = () => { apSave({on: $("ap-on").checked}); toast($("ap-on").checked ? "Автопилот включён: будет держать запас готовых статей и дописывать его, когда он просядет" : "Автопилот выключен"); };
 $("ap-week").onchange = () => { try { localStorage.setItem("per_week", $("ap-week").value); } catch (e) {} $("i-week").value = $("ap-week").value; apSave({per_week: +$("ap-week").value}); loadTopics(); };
 $("ap-mode").onchange = () => { $("img-mode").value = $("ap-mode").value; apSave({image_mode: $("ap-mode").value}); };
+$("ap-buffer").onchange = () => {
+  const n = Math.max(3, Math.min(60, +$("ap-buffer").value || 12));
+  $("ap-buffer").value = n; apSave({buffer_target: n});
+};
 loadQueue();
 // ---------- журнал заявок
 async function loadLeads(month) {
