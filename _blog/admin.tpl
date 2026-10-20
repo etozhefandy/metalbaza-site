@@ -79,13 +79,6 @@ textarea.body { min-height: 520px; font-family: var(--mono); font-size: 13px; }
 .checks li.ok::before { content: "✓"; color: var(--ok); }
 .checks li.warn::before { content: "!"; color: var(--warn); }
 .checks li.bad::before { content: "✕"; color: var(--bad); }
-.tabs { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-bottom: 16px; }
-@media (max-width: 900px) { .tabs { grid-template-columns: 1fr 1fr; } }
-.tabs button { text-align: left; border: 1px solid var(--line-2); background: #fff; border-radius: var(--r); padding: 10px 12px; cursor: pointer; display: grid; gap: 2px; }
-.tabs button b { font-weight: 600; font-size: 14px; }
-.tabs button span { font-size: 12px; color: var(--muted); }
-.tabs button:hover { border-color: var(--ink); }
-.tabs button.on { border-color: var(--blue); background: #f2f6ff; box-shadow: inset 0 0 0 1px var(--blue); }
 .pane { display: none; }
 .pane.on { display: block; }
 .new-foot { margin-top: 16px; padding-top: 12px; border-top: 1px solid var(--line); gap: 12px; }
@@ -251,13 +244,14 @@ body:not(.view-edit) .mbar { display: none !important; }
     <!-- Новая статья: сначала выбираем источник темы, потом пишем -->
     <section class="card ai" id="new-card">
       <h2>Новая статья <small id="model"></small></h2>
-      <p class="hint" style="margin:-6px 0 12px">Откуда берём тему?</p>
-      <div class="tabs" id="src-tabs" role="tablist">
-        <button type="button" data-tab="post" role="tab"><b>📎 Из поста или ссылки</b><span>новость, статья, пост в Instagram</span></button>
-        <button type="button" data-tab="demand" role="tab"><b>🔎 Из запросов</b><span>что ищут в Google и Яндексе</span></button>
-        <button type="button" data-tab="own" role="tab"><b>✍️ Своя тема</b><span>знаю, о чём написать</span></button>
-        <button type="button" data-tab="auto" role="tab"><b>✨ Придумай сам</b><span>ИИ выберет тему по спросу</span></button>
-      </div>
+      <label class="f" style="margin-bottom:16px">Откуда берём тему?
+        <select id="src-tabs">
+          <option value="post">📎 Из поста или ссылки — новость, статья, пост в Instagram</option>
+          <option value="demand">🔎 Из запросов — что ищут в Google и Яндексе</option>
+          <option value="own">✍️ Своя тема — знаю, о чём написать</option>
+          <option value="auto">✨ Придумай сам — ИИ выберет тему по спросу</option>
+        </select>
+      </label>
 
       <div class="pane" data-pane="post">
         <div class="grid">
@@ -924,13 +918,13 @@ $("b-del").onclick = async () => {
 // ИИ всегда пишет НОВУЮ статью: сохранённую (тем более опубликованную) он не перезаписывает.
 // «Написать»: статья уходит в очередь — текст и обложка готовятся на сервере, дата выхода — ближайший свободный день.
 async function generate(body, btn) { return enqueue(body, btn); }
-// ---------- вкладки «откуда тема»
+// ---------- источник темы (один выпадающий список; поля источника — под ним)
 function showTab(t) {
-  [...$("src-tabs").children].forEach(b => b.classList.toggle("on", b.dataset.tab === t));
+  $("src-tabs").value = t;
   document.querySelectorAll("#new-card .pane").forEach(p => p.classList.toggle("on", p.dataset.pane === t));
   try { localStorage.setItem("src_tab", t); } catch (e) {}
 }
-$("src-tabs").onclick = e => { const b = e.target.closest("[data-tab]"); if (b) showTab(b.dataset.tab); };
+$("src-tabs").onchange = () => showTab($("src-tabs").value);
 showTab((() => { try { return localStorage.getItem("src_tab"); } catch (e) {} })() || "post");
 // ---------- своя тема
 $("b-gen").onclick = () => {
