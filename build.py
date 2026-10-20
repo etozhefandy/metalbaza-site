@@ -794,6 +794,7 @@ def site_consts():
     """Настройки сайта для общего движка (engine/, enginekit.REQUIRED и DEFAULTS) — из src/siteconf.py."""
     n = cfg.NICHE
     return {
+        "SITE_CLARITY": CLARITY_ID,   # пульт берёт отсюда ссылку на проект Clarity
         "SITE_HOST": cfg.HOST, "SITE_URL": cfg.SITE_URL, "SITE_BRAND": cfg.BRAND, "SITE_BRAND_UPPER": cfg.BRAND_UPPER,
         "SITE_DATA": cfg.DATA_DIR_NAME, "SITE_INDEXNOW_KEY": INDEXNOW_KEY, "SITE_SETUP_SHA256": SETUP_CODE_SHA256,
         "SITE_COOKIE": "mb_admin", "SITE_PHONE": cfg.PHONE_DISPLAY, "SITE_TG_LABEL": cfg.TG_LABEL, "SITE_TG_HUB_UP": cfg.TG_HUB_UP,
