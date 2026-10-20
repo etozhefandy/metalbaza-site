@@ -7,6 +7,9 @@
 // Статья «на завтра» не отдаётся до своего времени — расписанию не нужен ни cron, ни компьютер.
 declare(strict_types=1);
 require_once __DIR__ . '/site.php';   // домен, бренд, ниша — пишет build.py из src/site.py
+// Необязательное расширение блога от сайта (например, попап в статьях под услугу): если build.py положил
+// _blog/popup.php (аналогично prompts.php), в нём ожидается function site_article_popup(array $article): string.
+if (is_file(__DIR__ . '/popup.php')) require_once __DIR__ . '/popup.php';
 
 if (!defined('SITE_DIR')) define('SITE_DIR', getenv('ALFIMOV_SITE') ?: dirname(__DIR__));
 if (!defined('DATA_DIR')) define('DATA_DIR', getenv('ALFIMOV_DATA') ?: dirname(SITE_DIR) . '/' . SITE_DATA);
@@ -578,6 +581,7 @@ function render_article(array $a, array $posts, bool $noindex = false): string
 ' . $faq . '
 ' . $related_html . '
 ' . lead_form('blog:' . $a['slug']) . '
+' . (function_exists('site_article_popup') ? site_article_popup($a) : '') . '
 ';
     $image = $a['cover_path'] ?: null;
     $posting = [
