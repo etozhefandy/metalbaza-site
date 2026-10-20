@@ -34,7 +34,7 @@ FONT_URL = (
 )
 # Microsoft Clarity — тепловые карты кликов и прокрутки, записи визитов (clarity.microsoft.com). Пусто — не ставится.
 # Поля ввода Clarity по умолчанию скрывает (телефоны в записи не попадают). Источники Clarity разрешены в CSP (static/.htaccess).
-CLARITY_ID = ""
+CLARITY_ID = "z0hfr76pkp"
 CLARITY_TAG = (
     '<script>(function(c,l,a,r,i,t,y){c[a]=c[a]||function(){(c[a].q=c[a].q||[]).push(arguments)};'
     't=l.createElement(r);t.async=1;t.src="https://www.clarity.ms/tag/"+i;y=l.getElementsByTagName(r)[0];'
