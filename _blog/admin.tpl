@@ -1251,6 +1251,7 @@ function stepLabel(st) {
   if (k === "gsc") return "забираю данные Search Console";
   if (k === "tune") return "Claude готовит правки статей (1–2 мин)";
   if (k === "links") return "расставляю ссылки между статьями";
+  if (k === "index") return "спрашиваю Google, в индексе ли статьи";
   if (k === "geo") return `спрашиваю ${a === "claude" ? "Claude" : "ChatGPT"}: «${(seo.geo_prompts || [])[+i] || ""}»`;
   if (k === "report") return "собираю отчёт";
   return st;
@@ -1310,6 +1311,8 @@ function renderSeo() {
     seo.links.map(l => `<li>${esc(l.from)} → <b>${esc(l.to)}</b> <small>по фразе «${esc(l.anchor)}»</small></li>`).join("") + `</ul></div>`);
   if (r && r.lint && r.lint.length) out.push(`<div class="seo-sec"><h3>🧰 Замечания по статьям</h3><ul class="seo-list">` +
     r.lint.map(x => `<li><a href="#" data-open="${esc(x.slug)}">${esc(x.title)}</a><br><small>${esc(x.issues.join(" · "))}</small></li>`).join("") + `</ul></div>`);
+  if (r && r.not_indexed && r.not_indexed.length) out.push(`<div class="seo-sec"><h3>📵 Не в индексе Google <span class="hint">· проверяется раз в 3 недели на каждую статью</span></h3><ul class="seo-list">` +
+    r.not_indexed.map(x => `<li><a href="#" data-open="${esc(x.slug)}">${esc(x.title)}</a><br><small>${esc(x.coverage)}</small></li>`).join("") + `</ul></div>`);
   if (r && r.errors && r.errors.length) out.push(`<p class="hint" style="margin-top:14px">⚠️ Не получилось: ${esc(r.errors.join("; "))}</p>`);
   $("seo-body").innerHTML = out.join("");
 }

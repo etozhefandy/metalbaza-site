@@ -19,6 +19,18 @@ const GSC_SCOPE = 'https://www.googleapis.com/auth/webmasters.readonly';
 const CTR_CURVE = [1 => .28, 2 => .15, 3 => .10, 4 => .07, 5 => .05, 6 => .04, 7 => .03, 8 => .025, 9 => .02, 10 => .018];
 const LINKS_PER_STEP = 3;         // статей на один шаг перелинковки
 const LINKS_MAX = 3;              // автоссылок в одной статье
+const INDEX_PER_STEP = 5;         // статей на один шаг проверки индексации в Google
+const INDEX_EVERY = 21 * 86400;   // статью не проверяем заново чаще, чем раз в 3 недели
+const COVERAGE_RU = [
+    'Submitted and indexed' => 'отправлена и в индексе',
+    'Crawled - currently not indexed' => 'просканирована, но пока не в индексе',
+    'Discovered - currently not indexed' => 'найдена, но ещё не просканирована',
+    'URL is unknown to Google' => 'Google о странице не знает',
+    'Duplicate without user-selected canonical' => 'Google посчитал дублем другой страницы',
+    'Duplicate, Google chose different canonical than user' => 'Google посчитал дублем другой страницы',
+    'Page with redirect' => 'страница с редиректом',
+    "Excluded by 'noindex' tag" => 'закрыта тегом noindex',
+];
 const GEO_CLAUDE_MODEL = 'claude-sonnet-5-5';
 const GEO_OPENAI_MODELS = ['gpt-5', 'gpt-4.1'];   // первая недоступна — пробуем следующую
 
@@ -152,6 +164,54 @@ function gsc_fetch(?callable $http = null, ?DateTimeImmutable $today = null): ar
     $cur = [$f($end->modify('-27 days')), $f($end)];
     $prev = [$f($end->modify('-55 days')), $f($end->modify('-28 days'))];
     return ['period' => $cur, 'cur' => gsc_query($cur[0], $cur[1], $http), 'prev' => gsc_query($prev[0], $prev[1], $http)];
+}
+
+// ---------------------------------------------------------------- проверка индексации
+
+// Клики и показы (gsc_query) видно только для страниц, которые Google уже показывает в поиске — а если
+// статью вообще не взяли в индекс (или выкинули из него), там просто тишина, и это легко не заметить.
+// URL Inspection API отвечает прямо: эта страница в индексе или нет, и если нет — то почему.
+
+function index_status_file(): string { return seo_dir() . '/index-status.json'; }
+
+/** Прямой вопрос Google про одну страницу: в индексе или нет. */
+function gsc_inspect(string $url, ?callable $http = null): array
+{
+    [$code, $d] = http_json('POST', 'https://searchconsole.googleapis.com/v1/urlInspection/index:inspect',
+        ['Authorization: Bearer ' . gsc_token($http), 'Content-Type: application/json'],
+        (string) json_encode(['inspectionUrl' => $url, 'siteUrl' => GSC_SITE]), 30, $http);
+    if ($code !== 200) throw new AiError("Проверка индексации ответила ошибкой ($code): " . ($d['error']['message'] ?? ''));
+    $r = $d['inspectionResult']['indexStatusResult'] ?? [];
+    $coverage = (string) ($r['coverageState'] ?? '');
+    return ['verdict' => (string) ($r['verdict'] ?? 'NEUTRAL'), 'coverage' => COVERAGE_RU[$coverage] ?? $coverage,
+        'checked' => now()->format('Y-m-d')];
+}
+
+/** Вышедшие статьи, которые ни разу не проверяли или проверяли давно (растягивает нагрузку на несколько недель). */
+function index_due(): array
+{
+    $live = live_articles();
+    if (!$live) return [];
+    $map = read_json(index_status_file()) ?? [];
+    $stale = now()->modify('-' . (int) (INDEX_EVERY / 86400) . ' days')->format('Y-m-d');
+    return array_values(array_map(fn($a) => $a['slug'],
+        array_filter($live, fn($a) => ($map[$a['slug']]['checked'] ?? '') < $stale)));
+}
+
+/** Проверить пачку статей, сохранить результат (по слагу) для отчёта. */
+function index_check(array $slugs, ?callable $http = null): int
+{
+    $live = array_column(live_articles(), null, 'slug');
+    $map = read_json(index_status_file()) ?? [];
+    $n = 0;
+    foreach ($slugs as $slug) {
+        $a = $live[$slug] ?? null;
+        if (!$a) continue;
+        $map[$slug] = gsc_inspect(parts()['site_url'] . article_path($a), $http);
+        $n++;
+    }
+    write_json(index_status_file(), $map);
+    return $n;
 }
 
 // ---------------------------------------------------------------- разбор данных
@@ -438,6 +498,9 @@ function seo_plan(bool $full = true): array
 {
     $steps = [];
     if ($full && gsc_account()) array_push($steps, 'gsc', 'tune');
+    if ($full && gsc_account()) {
+        foreach (array_chunk(index_due(), INDEX_PER_STEP) as $chunk) $steps[] = 'index:' . implode(',', $chunk);
+    }
     if (trim((string) (settings()['anthropic_key'] ?? '')) !== '') {
         foreach (array_chunk(links_due(), LINKS_PER_STEP) as $chunk) $steps[] = 'links:' . implode(',', $chunk);
     }
@@ -587,6 +650,8 @@ function seo_step(string $step, array $run): array
             return seo_tune();
         case 'links':
             return ['links' => make_links(explode(',', $arg))];
+        case 'index':
+            return ['checked' => index_check(explode(',', $arg))];
         case 'geo':
             [$engine, $i] = explode(':', $arg);
             $prompt = seo_settings()['geo_prompts'][(int) $i] ?? '';
@@ -649,6 +714,12 @@ function seo_report(array $run, ?callable $tg = null): array
     $live = live_articles();
     $lint = [];
     foreach ($live as $a) if ($issues = seo_lint($a)) $lint[] = ['slug' => $a['slug'], 'title' => $a['title'], 'issues' => $issues];
+    $idxMap = read_json(index_status_file()) ?? [];
+    $notIndexed = [];
+    foreach ($live as $a) {
+        $st = $idxMap[$a['slug']] ?? null;
+        if ($st && $st['verdict'] !== 'PASS') $notIndexed[] = ['slug' => $a['slug'], 'title' => $a['title'], 'coverage' => $st['coverage']];
+    }
     $links = array_sum(array_map(fn($r) => (int) ($r['links'] ?? 0), array_filter($res, fn($k) => str_starts_with($k, 'links:'), ARRAY_FILTER_USE_KEY)));
     $hits = count(array_filter($geo, fn($g) => $g['mentioned'] || $g['cited']));
     $sites = [];
@@ -656,7 +727,8 @@ function seo_report(array $run, ?callable $tg = null): array
     arsort($sites);
 
     $report = ['created' => now()->format('Y-m-d H:i'), 'analysis' => $an, 'tune' => $res['tune'] ?? null, 'links' => $links,
-        'geo' => $geo, 'geo_hits' => $hits, 'geo_sites' => array_slice($sites, 0, 10, true), 'lint' => $lint, 'errors' => $run['errors']];
+        'geo' => $geo, 'geo_hits' => $hits, 'geo_sites' => array_slice($sites, 0, 10, true), 'lint' => $lint,
+        'not_indexed' => $notIndexed, 'errors' => $run['errors']];
     write_json(seo_dir() . '/report.json', $report);
     $hist[] = ['date' => now()->format('Y-m-d'), 'geo_hits' => $hits, 'geo_total' => count($geo)]
         + ($an ? ['clicks' => $an['totals']['cur']['clicks'], 'impr' => $an['totals']['cur']['impr'], 'pos' => $an['totals']['cur']['pos']] : []);
@@ -709,6 +781,10 @@ function seo_report(array $run, ?callable $tg = null): array
         if ($sites) $lines[] = 'Чаще ссылаются на: ' . $e(implode(', ', array_slice(array_keys($sites), 0, 5)));
     }
     if ($lint) $lines[] = "\n🧰 Статей с замечаниями по оформлению: " . count($lint) . ' (подробности — во вкладке «SEO»)';
+    if ($notIndexed) {
+        $lines[] = "\n📵 <b>Не в индексе Google</b>: " . count($notIndexed) . ' ' . plural(count($notIndexed), 'статья', 'статьи', 'статей');
+        foreach (array_slice($notIndexed, 0, 3) as $x) $lines[] = "• {$e($x['title'])} — {$e($x['coverage'])}";
+    }
     if ($run['errors']) $lines[] = "\n⚠️ Не получилось: " . $e(implode('; ', array_slice($run['errors'], 0, 3)));
     $kb = [];
     if ($pending > 0) $kb[] = [['text' => "✅ Применить правки ($pending)", 'callback_data' => 'seo:apply']];
