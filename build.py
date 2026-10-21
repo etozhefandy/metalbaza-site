@@ -310,7 +310,9 @@ def page(*, path, title, desc, body, schema, noindex=False, og_type="website", i
 <link rel="icon" href="/favicon.svg" type="image/svg+xml">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="{FONT_URL}">
+<link rel="preload" as="style" href="{FONT_URL}">
+<link rel="stylesheet" href="{FONT_URL}" media="print" onload="this.media='all'">
+<noscript><link rel="stylesheet" href="{FONT_URL}"></noscript>
 <link rel="stylesheet" href="/assets/style.css?v={ASSET_VER}">
 <script>document.documentElement.classList.add('js')</script>
 <script type="application/ld+json">{json.dumps(graph, ensure_ascii=False)}</script>
