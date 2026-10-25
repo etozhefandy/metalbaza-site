@@ -171,15 +171,25 @@ function tg_set_commands(?callable $call = null): void
     ], JSON_UNESCAPED_UNICODE)], $call);
 }
 
+/** Ссылка на отправленное сообщение (chat_id + message_id), если Telegram её вернул — чтобы потом дописать в него же. */
+function tg_sent_ref(array $r): array
+{
+    $mid = $r['result']['message_id'] ?? null;
+    $cid = $r['result']['chat']['id'] ?? null;
+    return $mid !== null && $cid !== null ? [['chat' => (string) $cid, 'id' => (int) $mid]] : [];
+}
+
 /**
  * Заявка: всегда владельцу в личку и, если к сайту привязана группа, ещё в неё. Группа стала супергруппой —
  * переносим привязку и повторяем; бота убрали из группы — отвязываем и предупреждаем в личке.
+ * → ссылки на отправленные сообщения (для tg_edit_lead); пусто — отправить не удалось никуда.
  */
-function tg_send_lead(string $text, ?callable $call = null): bool
+function tg_send_lead(string $text, ?callable $call = null): array
 {
-    $ok = !empty(tg_send(tg_owner(), $text, $call)['ok']);
+    $r = tg_send(tg_owner(), $text, $call);
+    $sent = !empty($r['ok']) ? tg_sent_ref($r) : [];
     $group = tg_group();
-    if ($group === '' || $group === tg_owner()) return $ok;
+    if ($group === '' || $group === tg_owner()) return $sent;
     $r = tg_send($group, $text, $call);
     $new = $r['parameters']['migrate_to_chat_id'] ?? null;
     if (!$r['ok'] && $new) {
@@ -193,8 +203,19 @@ function tg_send_lead(string $text, ?callable $call = null): bool
         tg_unlink();
         tg_send(tg_owner(), "⚠️ Не удалось отправить заявку с " . tg_host() . " в группу «" . htmlspecialchars($title) . "» — бота, видимо, убрали. "
             . "Группа отвязана, заявки с этого сайта приходят только сюда. Привязать снова — кнопка «" . TG_BTN_PIN . "».", $call);
+    } else {
+        $sent = array_merge($sent, tg_sent_ref($r));
     }
-    return $ok || !empty($r['ok']);
+    return $sent;
+}
+
+/** Дописать в уже отправленные сообщения заявки (tg_send_lead) — например, статус CRM, без второго уведомления. */
+function tg_edit_lead(array $sent, string $text, ?callable $call = null): void
+{
+    foreach ($sent as $m) {
+        tg_api('editMessageText', ['chat_id' => $m['chat'], 'message_id' => $m['id'], 'text' => $text,
+            'parse_mode' => 'HTML', 'disable_web_page_preview' => 'true'], $call);
+    }
 }
 
 /** Новый одноразовый PIN для группы сайта (по умолчанию — этого) — владельцу в личку. */
