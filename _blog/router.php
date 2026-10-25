@@ -39,18 +39,21 @@ function send_media(string $name): void
     readfile($file);
 }
 
+$lang = ($_GET['lang'] ?? '') === 'kk' ? 'kk' : 'ru';   // «/kz/blog/…» — см. static/.htaccess сайта
 try {
     switch ($_GET['route'] ?? '') {
         case 'home':
-            send_html(render_home((string) file_get_contents(SITE_DIR . '/index.html'), live_articles()));
+            // главная всегда русская (казахской версии блок статей пока не касается) — независимо от $lang
+            send_html(render_home((string) file_get_contents(SITE_DIR . '/index.html'), live_articles(null, 'ru')));
             break;
         case 'index':
-            send_html(render_blog_index(live_articles()));
+            send_html(render_blog_index(live_articles(null, $lang), $lang));
             break;
         case 'article':
             $a = get_article((string) ($_GET['slug'] ?? ''));
-            if (!$a || !is_live($a)) not_found();
-            send_html(render_article($a, live_articles()));
+            // статья своего языка не на своём пути («/kz/blog/<ru-статья>/» и наоборот) — такой страницы нет
+            if (!$a || !is_live($a) || ($a['lang'] ?? 'ru') !== $lang) not_found();
+            send_html(render_article($a, live_articles(null, $lang)));
             // статья вышла по расписанию или обновилась — сообщить Bing и Яндексу (один раз на версию)
             try { indexnow_article($a); } catch (Throwable $ex) { error_log('indexnow: ' . $ex->getMessage()); }
             break;

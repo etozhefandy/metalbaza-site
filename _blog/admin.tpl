@@ -334,6 +334,7 @@ body:not(.view-edit) .mbar { display: none !important; }
       <div class="row new-foot">
         <label class="f inline">Объём<select id="g-words"><option value="1000">~1000 слов</option><option value="1500" selected>~1500 слов</option><option value="2000">~2000 слов</option><option value="2500">~2500 слов</option></select></label>
         <label class="f inline">Модель<select id="g-model" title="Кто пишет статьи, поставленные отсюда; по умолчанию — из «Настроек»"></select></label>
+        <label class="f inline">Язык<select id="g-lang" title="На каком языке написать эту статью"><option value="ru" selected>Русский</option><option value="kk">Қазақша</option></select></label>
         <label class="f inline">Ритм<select id="i-week"><option value="1">1 в неделю (вт)</option><option value="2" selected>2 в неделю (вт, чт)</option><option value="3">3 в неделю (пн, ср, пт)</option></select></label>
         <span class="spacer"></span>
         <span class="ai-status" id="g-status"></span>
@@ -348,6 +349,7 @@ body:not(.view-edit) .mbar { display: none !important; }
         <label class="f inline">Ритм<select id="ap-week"><option value="1">1 в неделю (вт)</option><option value="2">2 в неделю (вт, чт)</option><option value="3">3 в неделю (пн, ср, пт)</option></select></label>
         <label class="f inline">Обложка<select id="ap-mode"><option value="people">с людьми</option><option value="auto">авто</option><option value="abstract">без людей</option></select></label>
         <label class="f inline" title="Сколько готовых статей (текст и обложка, ждут своего дня) держать про запас"><input type="number" id="ap-buffer" min="3" max="60" step="1" style="width:64px"> про запас</label>
+        <label class="f inline" title="Автопилот и пачка выбранных тем будут иногда сами писать статью на казахском — случайно, в среднем такая доля"><input type="number" id="ap-kk" min="0" max="100" step="5" style="width:56px">% на казахском</label>
       </div>
       <p class="hint" id="q-buffer-status" style="margin:8px 0 0"></p>
       <ul class="qlist" id="q-list"></ul>
@@ -670,6 +672,7 @@ function qStatus(it) {
 function renderQueue(d) {
   $("ap-on").checked = d.autopilot; $("ap-week").value = String(d.per_week); $("ap-mode").value = d.image_mode;
   if (document.activeElement !== $("ap-buffer")) $("ap-buffer").value = d.buffer_target;
+  if (document.activeElement !== $("ap-kk")) $("ap-kk").value = d.kk_ratio;
   $("q-count").textContent = d.pending ? `· пишется ${d.pending}` : "";
   $("q-buffer-status").textContent = d.autopilot
     ? `Запас: ${d.ready} из ${d.buffer_target} готово` + (d.refilling ? " · пополняет" : d.ready >= d.buffer_target ? " · запас полный" : "")
@@ -677,7 +680,7 @@ function renderQueue(d) {
   // ближайшая дата выхода — сверху; у ещё не готовых даты нет, их показываем первыми (над ними уже идёт работа)
   const items = d.items.filter(it => it.stage !== "cancelled").sort((a, b) => (a.publish_at || "").localeCompare(b.publish_at || "")).slice(0, 8);
   $("q-list").innerHTML = items.map(it => `<li class="${it.stage}"><b>${esc(it.title || it.topic || (it.origin === "auto" ? "Автопилот подбирает тему" : "Статья по источнику"))}</b>
-    <span class="st">${esc(qStatus(it))}</span>${it.model ? `<span class="hint">${it.model.includes("sonnet") ? "Sonnet" : "Opus"}</span>` : ""}${it.origin !== "manual" ? `<span class="hint">${it.origin === "auto" ? "🤖" : "☑︎"}</span>` : ""}
+    <span class="st">${esc(qStatus(it))}</span>${it.lang === "kk" ? `<span class="hint">KZ</span>` : ""}${it.model ? `<span class="hint">${it.model.includes("sonnet") ? "Sonnet" : "Opus"}</span>` : ""}${it.origin !== "manual" ? `<span class="hint">${it.origin === "auto" ? "🤖" : "☑︎"}</span>` : ""}
     ${it.stage === "done" ? `<button class="btn" data-qopen="${esc(it.slug)}">Открыть</button>` : ""}
     ${it.stage === "queued" ? `<button class="btn" data-qcancel="${it.id}">Отменить</button>` : ""}</li>`).join("");
   $("q-list").classList.toggle("hidden", !items.length);
@@ -699,7 +702,7 @@ const loadQueue = () => api(BASE + "/api/queue").then(renderQueue).catch(() => {
 async function enqueue(body, btn) {
   busy(btn, true, "Ставлю в очередь…");
   try {
-    const d = await api(BASE + "/api/queue", {method: "POST", body: JSON.stringify({words: $("g-words").value, model: $("g-model").value, ...body})});
+    const d = await api(BASE + "/api/queue", {method: "POST", body: JSON.stringify({words: $("g-words").value, model: $("g-model").value, lang: $("g-lang").value, ...body})});
     qMine.add(d.item.id); qSeen[d.item.id] = d.item.stage; renderQueue(d);
     toast("Статья в очереди: текст и обложка уже готовятся. Когда будет готова — встанет на ближайший свободный день.");
     document.getElementById("q-card").scrollIntoView({behavior: "smooth", block: "start"});
@@ -719,6 +722,10 @@ $("ap-mode").onchange = () => { $("img-mode").value = $("ap-mode").value; apSave
 $("ap-buffer").onchange = () => {
   const n = Math.max(3, Math.min(60, +$("ap-buffer").value || 12));
   $("ap-buffer").value = n; apSave({buffer_target: n});
+};
+$("ap-kk").onchange = () => {
+  const n = Math.max(0, Math.min(100, +$("ap-kk").value || 0));
+  $("ap-kk").value = n; apSave({kk_ratio: n});
 };
 loadQueue();
 // ---------- журнал заявок

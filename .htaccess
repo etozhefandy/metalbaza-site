@@ -33,6 +33,11 @@ ErrorDocument 404 /404.html
   RewriteRule ^blog/$ _blog/router.php?route=index [L]
   RewriteRule ^blog/media/([A-Za-z0-9._-]+)$ _blog/router.php?route=media&f=$1 [L]
   RewriteRule ^blog/([a-z0-9-]+)/$ _blog/router.php?route=article&slug=$1 [L]
+  # Блог на казахском (static/_blog/lib.php: blog_path('kk')) — выключен (0% в автопилоте), но маршрут готов
+  RewriteRule ^kz/blog$ /kz/blog/ [L,R=301]
+  RewriteRule ^kz/blog/([a-z0-9-]+)$ /kz/blog/$1/ [L,R=301]
+  RewriteRule ^kz/blog/$ _blog/router.php?route=index&lang=kk [L]
+  RewriteRule ^kz/blog/([a-z0-9-]+)/$ _blog/router.php?route=article&slug=$1&lang=kk [L]
   RewriteRule ^admin$ /admin/ [L,R=301]
   RewriteRule ^admin/$ admin/index.php [L]
   RewriteRule ^admin/(api|preview)/(.*)$ admin/api.php?r=$1/$2 [L,QSA]

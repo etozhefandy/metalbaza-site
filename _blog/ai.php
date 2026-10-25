@@ -193,26 +193,31 @@ function writer_system_prompt(): string
     return P('writer', ['services' => $services]);
 }
 
-function writer_user_prompt(string $topic, array $keywords, string $notes, int $words, array $existing): string
+function writer_user_prompt(string $topic, array $keywords, string $notes, int $words, array $existing, string $lang = 'ru'): string
 {
     $lines = [trim($topic) !== '' ? 'Тема статьи: ' . trim($topic) : 'Тема статьи: выбери сам по источнику — то, что полезно читателю сайта.'];
     if ($keywords) $lines[] = 'Поисковые запросы (первый — главный): ' . implode('; ', $keywords);
     $lines[] = "Объём тела: около $words слов.";
     if (trim($notes) !== '') $lines[] = 'Пожелания редактора: ' . trim($notes);
+    if ($lang === 'kk') {
+        $lines[] = 'Язык статьи: казахский. Весь текст — заголовок, лид, тело, краткое содержание, FAQ, описание для поиска — '
+            . 'пиши на грамотном литературном казахском языке, естественно, не как перевод с русского. Адрес статьи (slug) всё равно латиницей.';
+    }
     $lines[] = $existing
-        ? "Существующие статьи блога (slug — заголовок):\n" . implode("\n", array_map(fn($a) => "- {$a['slug']} — {$a['title']}", $existing))
-        : 'Других статей в блоге пока нет.';
+        ? "Существующие статьи блога ($lang: slug — заголовок):\n" . implode("\n", array_map(fn($a) => "- {$a['slug']} — {$a['title']}", $existing))
+        : 'Других статей на этом языке в блоге пока нет.';
     return implode("\n", $lines);
 }
 
 /** Черновик статьи: все SEO-поля + тело. Публикует всегда человек.
- *  $source — материал-повод (статья, пост в Instagram): ['url','title','text','images' => [[mime, base64], …]]. */
-function write_article(string $topic, array $keywords, string $notes, int $words, array $existing, ?callable $post = null, ?array $source = null): array
+ *  $source — материал-повод (статья, пост в Instagram): ['url','title','text','images' => [[mime, base64], …]].
+ *  $existing — статьи блога ТОГО ЖЕ языка (для «похожих статей»/проверки slug — незачем предлагать перевод как related). */
+function write_article(string $topic, array $keywords, string $notes, int $words, array $existing, ?callable $post = null, ?array $source = null, string $lang = 'ru'): array
 {
     $has_source = $source && (trim((string) ($source['text'] ?? '')) !== '' || !empty($source['images']));
     if (trim($topic) === '' && !$has_source) throw new AiError('Укажите тему статьи или источник');
     $keywords = str_list($keywords);
-    $text = writer_user_prompt($topic, $keywords, $notes, $words, $existing);
+    $text = writer_user_prompt($topic, $keywords, $notes, $words, $existing, $lang);
     $content = $text;
     if ($has_source) {
         $content = [];

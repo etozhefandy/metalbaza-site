@@ -26,6 +26,7 @@ const AUTOPILOT_MAX_PER_DAY = 3;    // страховка от расходов 
 const BUFFER_TARGET_DEFAULT = 12;   // сколько готовых статей держать про запас, если не меняли в настройках
 const BUFFER_TARGET_MIN = 3;
 const BUFFER_TARGET_MAX = 60;
+const KK_RATIO_MAX = 100;           // доля статей на казахском (%); 0 по умолчанию — автопилот языком не занимается
 const QUEUE_KEEP = 30;              // сколько готовых записей помнить для админки
 
 function queue_file(): string { return DATA_DIR . '/queue.json'; }
@@ -56,17 +57,28 @@ function queue_settings(): array
     $week = (int) ($s['per_week'] ?? 2);
     $mode = (string) ($s['image_mode'] ?? 'people');
     $target = (int) ($s['buffer_target'] ?? BUFFER_TARGET_DEFAULT);
+    $kk = (int) ($s['kk_ratio'] ?? 0);
     return ['autopilot' => !empty($s['autopost']), 'per_week' => isset(SLOT_DAYS[$week]) ? $week : 2,
         'image_mode' => in_array($mode, IMG_MODES, true) ? $mode : 'people',
         'buffer_target' => $target >= BUFFER_TARGET_MIN && $target <= BUFFER_TARGET_MAX ? $target : BUFFER_TARGET_DEFAULT,
+        'kk_ratio' => $kk >= 0 && $kk <= KK_RATIO_MAX ? $kk : 0,
         'ready' => trim((string) ($s['anthropic_key'] ?? '')) !== '' && trim((string) ($s['openai_key'] ?? '')) !== ''];
+}
+
+/** Язык новой статьи, которую сам выбирает автопилот/пачка тем: случайно, по настроенной доле на казахском. */
+function queue_pick_lang(): string
+{
+    $ratio = queue_settings()['kk_ratio'];
+    return $ratio > 0 && random_int(1, 100) <= $ratio ? 'kk' : 'ru';
 }
 
 // ---------------------------------------------------------------- добавить в очередь
 
 /**
  * $spec: topic, keywords[], notes, words, source (как в admin/api.php: url, text, images — пути файлов), origin
- * (manual | bulk | auto), topic_key (ключ темы из списка). Без темы и источника — тему выберет задача «тема».
+ * (manual | bulk | auto), topic_key (ключ темы из списка), lang (ru | kk — не передан, значит сам решит по доле
+ * из настроек: так работает автопилот и пачка тем; из формы «Новая статья» язык приходит всегда явно).
+ * Без темы и источника — тему выберет задача «тема».
  */
 function queue_add(array $spec): array
 {
@@ -83,6 +95,7 @@ function queue_add(array $spec): array
         'topic' => $topic, 'topic_key' => (string) ($spec['topic_key'] ?? ''),
         'keywords' => array_values(str_list($spec['keywords'] ?? [])), 'notes' => (string) ($spec['notes'] ?? ''),
         'words' => max(500, min(4000, (int) ($spec['words'] ?? 1500) ?: 1500)), 'source' => (bool) $source,
+        'lang' => in_array($spec['lang'] ?? '', LANGS, true) ? $spec['lang'] : queue_pick_lang(),
         // модель, выбранная при постановке; пусто — из «Настроек» на момент написания
         'model' => isset(CLAUDE_MODELS[(string) ($spec['model'] ?? '')]) ? (string) $spec['model'] : '',
         'stage' => 'queued', 'tasks' => ($topic === '' && !$source ? ['topic' => $todo] : []) + ['text' => $todo, 'cover' => $todo],
@@ -253,10 +266,12 @@ function queue_run_task(string $task, array $item, ?callable $post = null): arra
             'keywords' => array_values(array_unique(array_filter([(string) $t['main_keyword'], ...array_map('strval', $t['keywords'] ?? [])])))];
     }
     if ($task === 'text') {
-        $existing = array_map(fn($a) => ['slug' => $a['slug'], 'title' => $a['title']], load_all());
+        $lang = in_array($item['lang'] ?? '', LANGS, true) ? $item['lang'] : 'ru';
+        $existing = array_map(fn($a) => ['slug' => $a['slug'], 'title' => $a['title']],
+            array_filter(load_all(), fn($a) => ($a['lang'] ?? 'ru') === $lang));
         $src_file = queue_dir() . "/{$item['id']}-source.json";
         $source = $item['source'] && is_file($src_file) ? job_source(read_json($src_file)) : null;
-        $a = write_article($item['topic'], $item['keywords'], $item['notes'], $item['words'], $existing, $post, $source);
+        $a = write_article($item['topic'], $item['keywords'], $item['notes'], $item['words'], $existing, $post, $source, $lang);
         if (!is_dir(queue_dir())) mkdir(queue_dir(), 0750, true);
         write_json(queue_dir() . "/{$item['id']}-article.json", $a);
         return ['title' => (string) ($a['title'] ?? '')];
@@ -291,6 +306,7 @@ function queue_finish(array $item): void
                 'slug' => $slug, 'title' => $a['title'] ?? $item['topic'], 'seo_title' => $a['seo_title'] ?? '', 'description' => $a['description'] ?? '',
                 'lead' => $a['lead'] ?? '', 'summary' => $a['summary'] ?? '', 'body_md' => $a['body_md'] ?? '', 'category' => $a['category'] ?? '',
                 'keywords' => $a['keywords'] ?? $item['keywords'], 'faq' => $a['faq'] ?? [], 'related' => $a['related'] ?? [],
+                'lang' => in_array($item['lang'] ?? '', LANGS, true) ? $item['lang'] : 'ru',
                 'cover_path' => $item['cover_path'], 'author' => defined('NICHE_AUTHOR') ? NICHE_AUTHOR : '',
                 'status' => 'scheduled', 'publish_at' => next_free_slot(queue_settings()['per_week']),
             ]);

@@ -25,8 +25,9 @@ const MONTHS = ['января', 'февраля', 'марта', 'апреля', 
 const FIELDS = [
     'slug' => '', 'title' => '', 'seo_title' => '', 'description' => '', 'lead' => '', 'summary' => '',
     'body_md' => '', 'category' => '', 'keywords' => [], 'cover_path' => '', 'author' => '', 'read_min' => null,
-    'faq' => [], 'related' => [], 'status' => 'draft', 'publish_at' => '', 'created_at' => '', 'updated_at' => '',
+    'faq' => [], 'related' => [], 'status' => 'draft', 'publish_at' => '', 'created_at' => '', 'updated_at' => '', 'lang' => 'ru',
 ];
+const LANGS = ['ru', 'kk'];   // статьи блога: русский (по умолчанию, старые статьи без поля — тоже он) и казахский
 
 // ---------------------------------------------------------------- время
 
@@ -98,6 +99,7 @@ function normalize(array $a): array
     }
     $out['faq'] = $faq;
     $out['related'] = array_values(array_filter(str_list($out['related']), fn($s) => $s !== $out['slug']));
+    $out['lang'] = in_array($out['lang'], LANGS, true) ? $out['lang'] : 'ru';
     $rm = $out['read_min'];
     $out['read_min'] = (is_numeric($rm) && (int) $rm > 0) ? (int) $rm : null;
     foreach (['created_at', 'updated_at'] as $k) $out[$k] = is_scalar($out[$k]) ? (string) $out[$k] : '';
@@ -215,9 +217,10 @@ function delete_article(string $slug): bool
     return unlink(article_file($slug));
 }
 
-function live_articles(?DateTimeImmutable $at = null): array
+/** $lang — null (по умолчанию) отдаёт все языки вместе (счётчики, карта сайта); для показа страницы нужен конкретный. */
+function live_articles(?DateTimeImmutable $at = null, ?string $lang = null): array
 {
-    return array_values(array_filter(load_all(), fn($a) => is_live($a, $at)));
+    return array_values(array_filter(load_all(), fn($a) => is_live($a, $at) && ($lang === null || $a['lang'] === $lang)));
 }
 
 function read_minutes(array $a): int
@@ -403,11 +406,20 @@ function parts(): array
     return $p;
 }
 
-function ui(string $k): string { return parts()['ui'][$k]; }
+// Казахские подписи и адрес блога — необязательные (build.py сайта может их не завести): без них казахская
+// статья просто выходит в оформлении на русском (хуже, чем полностью казахское, но не ошибка).
+function ui(string $k, string $lang = 'ru'): string
+{
+    $p = parts();
+    return $lang === 'kk' && isset($p['ui_kk'][$k]) ? $p['ui_kk'][$k] : $p['ui'][$k];
+}
 
-function blog_path(): string { return parts()['blog_path']; }
+function blog_path(string $lang = 'ru'): string
+{
+    return $lang === 'kk' ? (parts()['blog_path_kk'] ?? '/kz' . parts()['blog_path']) : parts()['blog_path'];
+}
 
-function article_path(array $a): string { return blog_path() . $a['slug'] . '/'; }
+function article_path(array $a): string { return blog_path($a['lang'] ?? 'ru') . $a['slug'] . '/'; }
 
 function post_date(array $a, string $field = 'publish_at'): string
 {
@@ -483,9 +495,11 @@ function faq_schema(array $items): array
 }
 
 /** Каркас страницы (шапка, меню, подвал, мета-теги) из build.py с подставленными значениями. */
-function page(string $path, string $title, string $desc, string $body, array $schema, string $og_type = 'website', ?string $image = null, bool $noindex = false): string
+function page(string $path, string $title, string $desc, string $body, array $schema, string $og_type = 'website', ?string $image = null, bool $noindex = false, string $lang = 'ru'): string
 {
-    $html = strtr(parts()['shell'], [
+    $p = parts();
+    $shell = $lang === 'kk' && isset($p['shell_kk']) ? $p['shell_kk'] : $p['shell'];
+    $html = strtr($shell, [
         '%%PATH%%' => $path, '%%TITLE%%' => e($title), '%%DESC%%' => e($desc), '%%OGTYPE%%' => $og_type,
         '%%IMAGE%%' => e($image ?: '/assets/og.png'), '%%BODY%%' => $body,
         '"__SCHEMA__"' => implode(', ', array_map('json_ld', $schema)),
@@ -494,16 +508,17 @@ function page(string $path, string $title, string $desc, string $body, array $sc
     return $html;
 }
 
-function render_blog_index(array $posts): string
+function render_blog_index(array $posts, string $lang = 'ru'): string
 {
     $site = parts()['site_url'];
-    $bp = blog_path();
+    $bp = blog_path($lang);
+    $u = fn($k) => ui($k, $lang);
     $body = '
 <section class="hero hero-svc">
   <div class="wrap">
-    <nav class="crumbs rv" aria-label="breadcrumbs"><a href="/">' . e(ui('breadcrumbs_home')) . '</a><span>/</span><span>' . e(ui('nav')) . '</span></nav>
-    <h1 class="rv">' . e(ui('title')) . '</h1>
-    <p class="hero-lead rv">' . e(ui('lead')) . '</p>
+    <nav class="crumbs rv" aria-label="breadcrumbs"><a href="/">' . e($u('breadcrumbs_home')) . '</a><span>/</span><span>' . e($u('nav')) . '</span></nav>
+    <h1 class="rv">' . e($u('title')) . '</h1>
+    <p class="hero-lead rv">' . e($u('lead')) . '</p>
   </div>
 </section>
 <section class="sec sec-tight">
@@ -512,20 +527,22 @@ function render_blog_index(array $posts): string
 ' . lead_form('blog') . '
 ';
     $schema = [
-        ['@type' => 'Blog', '@id' => "$site$bp#blog", 'name' => ui('title'), 'url' => "$site$bp",
-         'publisher' => ['@id' => "$site/#org"], 'inLanguage' => 'ru-KZ',
+        ['@type' => 'Blog', '@id' => "$site$bp#blog", 'name' => $u('title'), 'url' => "$site$bp",
+         'publisher' => ['@id' => "$site/#org"], 'inLanguage' => $lang === 'kk' ? 'kk-KZ' : 'ru-KZ',
          'blogPost' => array_map(fn($a) => ['@type' => 'BlogPosting', 'headline' => $a['title'],
              'url' => $site . article_path($a), 'datePublished' => post_date($a)], $posts)],
-        breadcrumbs_schema([[ui('breadcrumbs_home'), '/'], [ui('nav'), $bp]]),
+        breadcrumbs_schema([[$u('breadcrumbs_home'), '/'], [$u('nav'), $bp]]),
     ];
-    return page($bp, ui('meta_title'), ui('meta_desc'), $body, $schema);
+    return page($bp, $u('meta_title'), $u('meta_desc'), $body, $schema, 'website', null, false, $lang);
 }
 
-/** Страница статьи. $posts — вышедшие статьи (для «Читайте также»). */
+/** Страница статьи. $posts — вышедшие статьи (для «Читайте также») — языки, кроме языка самой статьи, отбрасываются. */
 function render_article(array $a, array $posts, bool $noindex = false): string
 {
+    $lang = $a['lang'] ?? 'ru';
+    $posts = array_values(array_filter($posts, fn($p) => ($p['lang'] ?? 'ru') === $lang));
     $site = parts()['site_url'];
-    $bp = blog_path();
+    $bp = blog_path($lang);
     $arrow = parts()['icon_arrow_sm'];
     $path = article_path($a);
     [$body_html, $toc] = markdown(auto_links($a['body_md'], article_links($a['slug'], $posts)));
@@ -539,10 +556,10 @@ function render_article(array $a, array $posts, bool $noindex = false): string
     $toc_html = '';
     if (count($toc) >= 2) {
         $items = implode('', array_map(fn($t) => '<li><a href="#' . $t[0] . '">' . e($t[1]) . '</a></li>', $toc));
-        $toc_html = '<nav class="art-toc" aria-label="' . e(ui('toc')) . '"><p class="eyebrow">' . e(ui('toc')) . '</p><ol>' . $items . '</ol></nav>';
+        $toc_html = '<nav class="art-toc" aria-label="' . e(ui('toc', $lang)) . '"><p class="eyebrow">' . e(ui('toc', $lang)) . '</p><ol>' . $items . '</ol></nav>';
     }
     $cover = $a['cover_path'] !== '' ? '<img class="art-cover" src="' . e($a['cover_path']) . '" alt="' . e($a['title']) . '" loading="lazy">' : '';
-    $summary = $a['summary'] !== '' ? '<aside class="art-summary"><p class="eyebrow"><span>→</span>' . e(ui('summary')) . '</p><p>' . e($a['summary']) . '</p></aside>' : '';
+    $summary = $a['summary'] !== '' ? '<aside class="art-summary"><p class="eyebrow"><span>→</span>' . e(ui('summary', $lang)) . '</p><p>' . e($a['summary']) . '</p></aside>' : '';
     $author = $a['author'] !== '' ? ' · ' . e($a['author']) : '';
     // «обновлено» видно читателю и поисковикам: свежесть — один из сигналов для ИИ-ответов
     if (post_date($a, 'updated_at') > post_date($a)) $author .= ' · обновлено ' . e(human_date(post_date($a, 'updated_at')));
@@ -552,9 +569,9 @@ function render_article(array $a, array $posts, bool $noindex = false): string
         $related_html = '
 <section class="sec sec-soft">
   <div class="wrap">
-    <div class="sec-head rv">' . eyebrow('→', ui('related')) . '<h2>' . e(ui('related')) . '</h2></div>
+    <div class="sec-head rv">' . eyebrow('→', ui('related', $lang)) . '<h2>' . e(ui('related', $lang)) . '</h2></div>
     <div class="post-grid">' . post_cards($related) . '</div>
-    <p class="post-all"><a class="tlink" href="' . $bp . '">' . e(ui('all')) . ' ' . $arrow . '</a></p>
+    <p class="post-all"><a class="tlink" href="' . $bp . '">' . e(ui('all', $lang)) . ' ' . $arrow . '</a></p>
   </div>
 </section>';
     }
@@ -562,7 +579,7 @@ function render_article(array $a, array $posts, bool $noindex = false): string
     $body = '
 <section class="hero hero-svc hero-art">
   <div class="wrap">
-    <nav class="crumbs rv" aria-label="breadcrumbs"><a href="/">' . e(ui('breadcrumbs_home')) . '</a><span>/</span><a href="' . $bp . '">' . e(ui('nav')) . '</a></nav>
+    <nav class="crumbs rv" aria-label="breadcrumbs"><a href="/">' . e(ui('breadcrumbs_home', $lang)) . '</a><span>/</span><a href="' . $bp . '">' . e(ui('nav', $lang)) . '</a></nav>
     <p class="post-meta rv">' . post_meta($a) . $author . '</p>
     <h1 class="rv">' . e($a['title']) . '</h1>
     ' . $lead . '
@@ -586,16 +603,16 @@ function render_article(array $a, array $posts, bool $noindex = false): string
     $image = $a['cover_path'] ?: null;
     $posting = [
         '@type' => 'BlogPosting', 'headline' => $a['title'], 'description' => $a['description'],
-        'datePublished' => post_date($a), 'dateModified' => post_date($a, 'updated_at'), 'inLanguage' => 'ru-KZ',
+        'datePublished' => post_date($a), 'dateModified' => post_date($a, 'updated_at'), 'inLanguage' => $lang === 'kk' ? 'kk-KZ' : 'ru-KZ',
         'mainEntityOfPage' => $site . $path, 'image' => $site . ($image ?: '/assets/og.png'),
         'author' => $a['author'] !== '' ? ['@type' => 'Person', 'name' => $a['author']] : ['@id' => "$site/#org"],
         'publisher' => ['@id' => "$site/#org"],
     ];
     if ($a['keywords']) $posting['keywords'] = implode(', ', $a['keywords']);
     if ($a['category'] !== '') $posting['articleSection'] = $a['category'];
-    $schema = [$posting, breadcrumbs_schema([[ui('breadcrumbs_home'), '/'], [ui('nav'), $bp], [$a['title'], $path]])];
+    $schema = [$posting, breadcrumbs_schema([[ui('breadcrumbs_home', $lang), '/'], [ui('nav', $lang), $bp], [$a['title'], $path]])];
     if ($a['faq']) $schema[] = faq_schema($a['faq']);
-    return page($path, $a['seo_title'] ?: $a['title'] . ' | ' . SITE_BRAND, $a['description'] ?: $a['lead'], $body, $schema, 'article', $image, $noindex);
+    return page($path, $a['seo_title'] ?: $a['title'] . ' | ' . SITE_BRAND, $a['description'] ?: $a['lead'], $body, $schema, 'article', $image, $noindex, $lang);
 }
 
 // Автоссылки между статьями (подбирает SEO-автопилот, seo.php): текст статьи не меняется, ссылка ставится
@@ -655,10 +672,13 @@ function render_sitemap(string $base, array $posts): string
     if (!$posts) return $base;
     $site = parts()['site_url'];
     $rows = [];
-    $dates = array_map(fn($a) => post_date($a, 'updated_at'), $posts);
-    $rows[] = '<url><loc>' . $site . blog_path() . '</loc><lastmod>' . max($dates) . '</lastmod></url>';
-    foreach ($posts as $i => $a) {
-        $rows[] = '<url><loc>' . $site . article_path($a) . '</loc><lastmod>' . $dates[$i] . '</lastmod></url>';
+    // список статей ("/blog/" или "/kz/blog/") — по одной записи на каждый язык, который реально есть среди вышедших
+    foreach (array_unique(array_column($posts, 'lang')) as $lang) {
+        $dates = array_map(fn($a) => post_date($a, 'updated_at'), array_filter($posts, fn($a) => $a['lang'] === $lang));
+        $rows[] = '<url><loc>' . $site . blog_path($lang) . '</loc><lastmod>' . max($dates) . '</lastmod></url>';
+    }
+    foreach ($posts as $a) {
+        $rows[] = '<url><loc>' . $site . article_path($a) . '</loc><lastmod>' . post_date($a, 'updated_at') . '</lastmod></url>';
     }
     return str_replace('</urlset>', implode("\n", $rows) . "\n</urlset>", $base);
 }

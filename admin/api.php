@@ -95,9 +95,11 @@ function execute(array $job): array
     $in = $job['input'];
     switch ($job['type']) {
         case 'generate':
-            $existing = array_map(fn($a) => ['slug' => $a['slug'], 'title' => $a['title']], load_all());
+            $lang = in_array($in['lang'] ?? '', LANGS, true) ? $in['lang'] : 'ru';
+            $existing = array_map(fn($a) => ['slug' => $a['slug'], 'title' => $a['title']],
+                array_filter(load_all(), fn($a) => ($a['lang'] ?? 'ru') === $lang));
             return ['article' => write_article((string) $in['topic'], $in['keywords'], (string) $in['notes'], (int) $in['words'], $existing,
-                null, job_source($in['source'] ?? null))];
+                null, job_source($in['source'] ?? null), $lang)];
         case 'image':
             $img = generate_image($in['kind'], (string) $in['title'], (string) $in['lead'], (string) $in['idea'], (string) $in['mode'],
                 ['summary' => (string) ($in['summary'] ?? ''), 'body' => (string) ($in['body'] ?? '')]);
@@ -202,6 +204,7 @@ function generate_input(array $d): array
         'notes' => (string) ($d['notes'] ?? ''),
         'words' => max(500, min(4000, (int) ($d['words'] ?? 1500) ?: 1500)),
         'model' => (string) ($d['model'] ?? ''),
+        'lang' => in_array($d['lang'] ?? '', LANGS, true) ? $d['lang'] : 'ru',
     ];
 }
 
@@ -277,6 +280,11 @@ try {
             $t = (int) $d['buffer_target'];
             if ($t < BUFFER_TARGET_MIN || $t > BUFFER_TARGET_MAX) fail("Запас — от " . BUFFER_TARGET_MIN . " до " . BUFFER_TARGET_MAX . " статей");
             $s['buffer_target'] = $t;
+        }
+        if (isset($d['kk_ratio'])) {
+            $k = (int) $d['kk_ratio'];
+            if ($k < 0 || $k > KK_RATIO_MAX) fail("Доля на казахском — от 0 до " . KK_RATIO_MAX . "%");
+            $s['kk_ratio'] = $k;
         }
         save_settings($s);
         if (!empty($d['on'])) { $q = queue_state(); $q['checked'] = 0; queue_save($q); queue_maybe_kick(); }

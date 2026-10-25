@@ -402,7 +402,8 @@ function make_links(array $slugs, ?callable $post = null): int
             if (($l['from'] ?? '') !== $a['slug'] || count($mine) >= LINKS_MAX) continue;
             $to = (string) ($l['to'] ?? '');
             $anchor = trim((string) ($l['anchor'] ?? ''));
-            if ($to === $a['slug'] || !isset($by[$to]) || in_array($to, array_column($mine, 'to'), true)) continue;
+            // ссылка только на статью того же языка — иначе читатель казахской статьи попадёт на русскую страницу и наоборот
+            if ($to === $a['slug'] || !isset($by[$to]) || ($by[$to]['lang'] ?? 'ru') !== ($a['lang'] ?? 'ru') || in_array($to, array_column($mine, 'to'), true)) continue;
             if (mb_strlen($anchor) < 4 || auto_links($a['body_md'], [['to' => $to, 'anchor' => $anchor]]) === $a['body_md']) continue;
             $mine[] = ['to' => $to, 'anchor' => $anchor];
         }
