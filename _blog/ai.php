@@ -241,6 +241,51 @@ function write_article(string $topic, array $keywords, string $notes, int $words
     return $data;
 }
 
+// ---------------------------------------------------------------- переписать по комментарию
+
+/** Та же ARTICLE_SCHEMA, но без slug — правка существующей статьи, адрес (URL) не меняется. */
+function rewrite_schema(): array
+{
+    $props = ARTICLE_SCHEMA['properties'];
+    unset($props['slug']);
+    return ['type' => 'object', 'properties' => $props,
+        'required' => array_values(array_diff(ARTICLE_SCHEMA['required'], ['slug'])), 'additionalProperties' => false];
+}
+
+function rewrite_user_prompt(array $a, string $comment, array $existing): string
+{
+    $lines = ['Текущая статья — перепиши её с учётом комментария ниже. Это не новая тема, адрес статьи не меняется.',
+        'Заголовок: ' . $a['title'], 'Лид: ' . $a['lead'], '«Коротко»: ' . $a['summary'], 'Раздел: ' . $a['category'],
+        'Запросы (первый — главный): ' . implode('; ', $a['keywords']), "Текст:\n" . $a['body_md']];
+    if ($a['faq']) $lines[] = "FAQ:\n" . implode("\n", array_map(fn($f) => "- {$f[0]} — {$f[1]}", $a['faq']));
+    if (($a['lang'] ?? 'ru') === 'kk') $lines[] = 'Язык статьи — казахский, пиши ответ на казахском.';
+    $lines[] = "\nКомментарий редактора — что поправить:\n" . trim($comment);
+    $lines[] = $existing
+        ? "Существующие статьи блога (slug — заголовок):\n" . implode("\n", array_map(fn($x) => "- {$x['slug']} — {$x['title']}", $existing))
+        : 'Других статей в блоге пока нет.';
+    return implode("\n", $lines);
+}
+
+/** Переписать статью по комментарию редактора: тот же адрес (slug), всё остальное — заново, с учётом текущего
+ *  текста и комментария. Не сохраняет — просто возвращает черновик, публикует и сохраняет всегда человек. */
+function rewrite_article(array $current, string $comment, array $existing, ?callable $post = null): array
+{
+    if (trim($comment) === '') throw new AiError('Опишите, что поправить');
+    $data = claude_json([
+        'max_tokens' => 32000,
+        'thinking' => ['type' => 'adaptive'],
+        'output_config' => ['effort' => 'high', 'format' => ['type' => 'json_schema', 'schema' => rewrite_schema()]],
+        'system' => writer_system_prompt(),
+        'messages' => [['role' => 'user', 'content' => rewrite_user_prompt($current, $comment, $existing)]],
+    ], $post);
+    $known = array_column($existing, 'slug');
+    $data['faq'] = array_map(fn($f) => [$f['q'] ?? '', $f['a'] ?? ''], $data['faq'] ?? []);
+    $data['related'] = array_values(array_filter($data['related'] ?? [], fn($s) => in_array($s, $known, true)));
+    $data['keywords'] = ($data['keywords'] ?? []) ?: $current['keywords'];
+    $data['slug'] = $current['slug'];
+    return $data;
+}
+
 // ---------------------------------------------------------------- статья по источнику
 
 // Свежий материал (новость, пост в Instagram) — повод для статьи «в повестке». Свой текст, а не пересказ:

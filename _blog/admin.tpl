@@ -480,6 +480,12 @@ body:not(.view-edit) .mbar { display: none !important; }
 
     <div class="ecols">
       <div class="ecol-main">
+        <section class="card hidden" id="rewrite-card">
+          <h2>✏️ Переписать с комментарием</h2>
+          <label class="f">Что поправить — пишите своими словами: что не так, что добавить, что убрать<textarea id="f-comment" rows="3" placeholder="Например: сделай заголовок короче, добавь пример с цифрами в раздел про бюджет, убери последний абзац"></textarea></label>
+          <div class="row" style="margin-top:10px"><span class="spacer"></span><button class="btn btn-p" type="button" id="b-rewrite">Переписать статью (ИИ)</button></div>
+          <p class="hint" style="margin:8px 0 0">ИИ учтёт весь текущий текст статьи и ваш комментарий, перепишет заново. Ничего не сохранится, пока вы сами не нажмёте «Сохранить» — можно отменить, просто закрыв статью без сохранения.</p>
+        </section>
         <section class="card">
           <label class="f">Заголовок статьи (h1) <span class="cnt" id="c-title"></span><input type="text" id="f-title" class="big"></label>
           <label class="f" style="margin-top:14px">Лид — подзаголовок под заголовком<textarea id="f-lead" rows="2"></textarea></label>
@@ -774,6 +780,8 @@ function open(a) {
   $("ed-badge").textContent = label; $("ed-badge").className = "badge " + cls;
   $("b-now").textContent = $("m-now").textContent = a && a.state === "live" ? "Сохранить на сайте" : "Опубликовать сейчас";
   $("b-del").classList.toggle("hidden", !a);
+  $("rewrite-card").classList.toggle("hidden", !a);
+  $("f-comment").value = "";
   $("img-note").textContent = "";
   showEditor();
   if (!a) { $("g-topic").value = ""; $("g-keys").value = ""; $("g-notes").value = ""; }
@@ -1008,6 +1016,19 @@ $("b-inline-img").onclick = async () => {
   const md = `\n\n![${idea.trim().replace(/[\[\]]/g, "")}](${path})\n\n`;
   ta.value = ta.value.slice(0, pos) + md + ta.value.slice(pos);
   dirty = true; refresh(); toast("Иллюстрация вставлена в текст");
+};
+$("b-rewrite").onclick = async () => {
+  const comment = $("f-comment").value.trim();
+  if (!comment) { toast("Опишите, что поправить", true); $("f-comment").focus(); return; }
+  if (dirty && !confirm("Есть несохранённые правки в полях — при переписывании они заменятся тем, что получится у ИИ. Продолжить?")) return;
+  busy($("b-rewrite"), true, "Переписываю… 1–2 мин");
+  try {
+    const {article} = await runJob(BASE + "/api/rewrite", {slug: current.slug, comment});
+    fill(article);
+    $("f-comment").value = "";
+    toast("Готово — проверьте текст и нажмите «Сохранить», когда устроит");
+  } catch (e) { toast(e.message, true); }
+  busy($("b-rewrite"), false);
 };
 const SERVICE_NAMES = %%SERVICE_NAMES%%;  // slug → название раздела сайта (подставляет admin/index.php)
 // ---------- темы: общий список всех тем, что предлагал ИИ (написать / отклонить / вернуть)

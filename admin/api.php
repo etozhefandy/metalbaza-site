@@ -113,6 +113,12 @@ function execute(array $job): array
             return tune_articles($in['queries'], $in['pages']);
         case 'ideas':
             return ideas_with_plan(propose_ideas((string) $in['focus']), (int) $in['per_week']);
+        case 'rewrite':
+            $current = get_article((string) $in['slug']);
+            if (!$current) throw new InvalidArgumentException('Статья не найдена');
+            $existing = array_map(fn($a) => ['slug' => $a['slug'], 'title' => $a['title']],
+                array_filter(load_all(), fn($a) => $a['slug'] !== $current['slug'] && ($a['lang'] ?? 'ru') === ($current['lang'] ?? 'ru')));
+            return ['article' => rewrite_article($current, (string) $in['comment'], $existing)];
     }
     throw new RuntimeException('Неизвестная задача');
 }
@@ -310,6 +316,14 @@ try {
         reply(['ok' => true]);
     }
     if ($method === 'POST' && $route === 'api/generate') reply(new_job('generate', generate_input(body())));
+    if ($method === 'POST' && $route === 'api/rewrite') {
+        $d = body();
+        $slug = (string) ($d['slug'] ?? '');
+        $comment = trim((string) ($d['comment'] ?? ''));
+        if (!get_article($slug)) fail('Статья не найдена', 404);
+        if ($comment === '') fail('Опишите, что поправить');
+        reply(new_job('rewrite', ['slug' => $slug, 'comment' => mb_substr($comment, 0, 4000)]));
+    }
     if ($method === 'POST' && $route === 'api/image') {
         $d = body();
         reply(new_job('image', [
