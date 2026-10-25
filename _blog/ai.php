@@ -536,10 +536,45 @@ function generate_image(string $kind, string $title, string $lead, string $idea,
 
 // ---------------------------------------------------------------- идеи тем
 
-// Ритм: дни недели (пн=1 … вс=7) для 1, 2 и 3 статей в неделю; выход в 10:00 Алматы.
-// Регулярность важнее объёма: владельцы бизнеса читают в будни утром.
-const SLOT_DAYS = [1 => [2], 2 => [2, 4], 3 => [1, 3, 5]];
-const SLOT_HOUR = 10;
+// Ритм: от 1 до 14 статей в неделю. До 7 — по одной утром (10:00 Алматы) на день недели (пн=1 … вс=7),
+// дни растут равномерно. Больше 7 — ко всем дням утренний слот уже есть, и к части дней добавляется ещё
+// вечерний (18:00), по одному дню за уровень; на 14 вечерний слот есть у каждого дня — 2 статьи в день.
+const SLOT_HOUR = 10;     // утро
+const SLOT_HOUR_PM = 18;  // вечер — только когда слотов в неделе больше 7
+const SLOT_WEEKDAYS = [
+    1 => [2], 2 => [2, 4], 3 => [1, 3, 5], 4 => [1, 3, 5, 7],
+    5 => [1, 2, 3, 4, 5], 6 => [1, 2, 3, 4, 5, 6], 7 => [1, 2, 3, 4, 5, 6, 7],
+];
+const SLOT_EXTRA_PM = [1, 3, 5, 2, 4, 6, 7];   // для 8..14 — вечерний слот этим дням, по одному в очереди за уровень
+
+/** Слоты недели для ритма — список [день недели, час]; null — такого ритма нет (не 1..14). */
+function slot_plan(int $per_week): ?array
+{
+    if ($per_week < 1 || $per_week > 14) return null;
+    $slots = array_map(fn($wd) => [$wd, SLOT_HOUR], SLOT_WEEKDAYS[min($per_week, 7)]);
+    for ($i = 0; $i < $per_week - 7; $i++) $slots[] = [SLOT_EXTRA_PM[$i], SLOT_HOUR_PM];
+    return $slots;
+}
+
+/** Сколько статей в день — страховка от расходов при сбоях автопилота; растёт вместе с ритмом, чтобы
+ *  при частом выходе (например 14 в неделю) запас на будущее набирался не неделями, а за несколько дней. */
+function autopilot_max_per_day(int $per_week): int { return max(3, (int) ceil($per_week / 2)); }
+
+/** Первый свободный слот (день недели + час) строго после $after, с учётом занятых слотов. */
+function slot_after(DateTimeImmutable $after, array $slots, array $taken): ?DateTimeImmutable
+{
+    $day = $after->setTime(0, 0);
+    for ($i = 0; $i < 400; $i++, $day = $day->modify('+1 day')) {
+        $today = array_values(array_filter($slots, fn($p) => $p[0] === (int) $day->format('N')));
+        usort($today, fn($a, $b) => $a[1] <=> $b[1]);
+        foreach ($today as [, $hour]) {
+            $candidate = $day->setTime($hour, 0);
+            if ($candidate <= $after || isset($taken[$candidate->format('Y-m-d\TH:i')])) continue;
+            return $candidate;
+        }
+    }
+    return null;
+}
 
 const IDEAS_SCHEMA = [
     'type' => 'object',
@@ -996,47 +1031,42 @@ function topics_view(int $per_week = 2): array
     return ['topics' => $plan['ideas'], 'per_week' => $plan['per_week']];
 }
 
-/** Ближайший свободный слот по ритму (вт/чт и т. д., 10:00 Алматы): день, на который ещё не стоит другая статья. */
+/** Ближайший свободный слот по ритму: день и час (может быть сегодня, если его слот ещё не прошёл). */
 function next_free_slot(int $per_week = 2, string $exclude_slug = '', ?DateTimeImmutable $now = null): string
 {
-    $per_week = isset(SLOT_DAYS[$per_week]) ? $per_week : 2;
+    $per_week = slot_plan($per_week) !== null ? $per_week : 2;
     $now ??= now();
     $taken = [];
     foreach (load_all() as $a) {
         if ($a['slug'] === $exclude_slug || $a['status'] !== 'scheduled') continue;
-        if ($dt = parse_dt($a['publish_at'])) $taken[$dt->format('Y-m-d')] = true;
+        if ($dt = parse_dt($a['publish_at'])) $taken[$dt->format('Y-m-d\TH:i')] = true;
     }
-    $day = $now->setTime(SLOT_HOUR, 0);
-    if ($day <= $now) $day = $day->modify('+1 day');
-    for ($i = 0; $i < 400; $i++, $day = $day->modify('+1 day')) {
-        if (in_array((int) $day->format('N'), SLOT_DAYS[$per_week], true) && !isset($taken[$day->format('Y-m-d')])) break;
-    }
-    return $day->format('Y-m-d\TH:i');
+    return slot_after($now, slot_plan($per_week), $taken)->format('Y-m-d\TH:i');
 }
 
-/** Идеи + used (по теме уже есть статья) + suggested_date — следующие свободные слоты ритма. */
+/** Идеи + used (по теме уже есть статья) + suggested_date — следующие свободные слоты ритма, начиная со
+ *  следующего дня после $start (сегодняшний слот, даже свободный, в план новых тем не предлагаем). */
 function ideas_with_plan(?array $result, int $per_week = 2, ?DateTimeImmutable $start = null): array
 {
     if (!$result) return ['ideas' => [], 'per_week' => $per_week];
-    $per_week = isset(SLOT_DAYS[$per_week]) ? $per_week : 2;
+    $per_week = slot_plan($per_week) !== null ? $per_week : 2;
+    $slots = slot_plan($per_week);
     $articles = load_all();
     $known = [];
     $taken = [];
     foreach ($articles as $a) {
         foreach ($a['keywords'] as $k) $known[mb_strtolower(trim($k))] = true;
-        if ($dt = parse_dt($a['publish_at'])) $taken[$dt->format('Y-m-d')] = true;
+        if ($dt = parse_dt($a['publish_at'])) $taken[$dt->format('Y-m-d\TH:i')] = true;
     }
-    $day = ($start ?? now())->setTime(SLOT_HOUR, 0);
+    $cursor = ($start ?? now())->setTime(23, 59, 59);
     $ideas = [];
     foreach ($result['ideas'] ?? [] as $idea) {
         $idea['used'] = isset($known[mb_strtolower(trim((string) ($idea['main_keyword'] ?? '')))]);
         $idea['suggested_date'] = '';
-        if (!$idea['used'] && ($idea['status'] ?? 'new') === 'new') {
-            do {
-                $day = $day->modify('+1 day');
-            } while (!in_array((int) $day->format('N'), SLOT_DAYS[$per_week], true) || isset($taken[$day->format('Y-m-d')]));
-            $taken[$day->format('Y-m-d')] = true;
-            $idea['suggested_date'] = $day->format('Y-m-d\TH:i');
+        if (!$idea['used'] && ($idea['status'] ?? 'new') === 'new' && ($next = slot_after($cursor, $slots, $taken))) {
+            $taken[$next->format('Y-m-d\TH:i')] = true;
+            $idea['suggested_date'] = $next->format('Y-m-d\TH:i');
+            $cursor = $next;
         }
         $ideas[] = $idea;
     }

@@ -12,7 +12,8 @@
 // Автопилот — тумблер поверх очереди: держит запас готовых статей (текст + обложка, ждут своего дня по ритму
 // выхода). Запас — не «подливаем по одной на каждый чих»: пока его хватает (выше низкой отметки, ¼ от цели),
 // автопилот молчит; просел до низкой — пишет пачкой, пока не наберёт полный запас снова (но не быстрее
-// AUTOPILOT_MAX_PER_DAY в день — это и есть «подстраивается под темп», большой недобор не пишется за один присест).
+// autopilot_max_per_day() в день — растёт вместе с ритмом выхода, это и есть «подстраивается под темп»,
+// большой недобор не пишется за один присест).
 // Ритм выхода (per_week) этим не затрагивается: он только расставляет готовые статьи по дням, запас может
 // растянуться на много недель вперёд.
 declare(strict_types=1);
@@ -22,7 +23,7 @@ require_once dirname(__DIR__) . '/api/_tg.php';
 const QUEUE_LEASE = 330;            // задача дольше этого — оборвана хостингом (PHP-лимит 300 с)
 const QUEUE_KICK_EVERY = 20;        // не чаще — повторный пинок очереди
 const AUTOPILOT_CHECK_EVERY = 600;  // как часто заходы на сайт проверяют план для автопилота
-const AUTOPILOT_MAX_PER_DAY = 3;    // страховка от расходов при сбоях
+const AUTOPILOT_MAX_PER_DAY = 3;    // страховка от расходов при сбоях — нижняя граница autopilot_max_per_day()
 const BUFFER_TARGET_DEFAULT = 12;   // сколько готовых статей держать про запас, если не меняли в настройках
 const BUFFER_TARGET_MIN = 3;
 const BUFFER_TARGET_MAX = 60;
@@ -58,7 +59,7 @@ function queue_settings(): array
     $mode = (string) ($s['image_mode'] ?? 'people');
     $target = (int) ($s['buffer_target'] ?? BUFFER_TARGET_DEFAULT);
     $kk = (int) ($s['kk_ratio'] ?? 0);
-    return ['autopilot' => !empty($s['autopost']), 'per_week' => isset(SLOT_DAYS[$week]) ? $week : 2,
+    return ['autopilot' => !empty($s['autopost']), 'per_week' => slot_plan($week) !== null ? $week : 2,
         'image_mode' => in_array($mode, IMG_MODES, true) ? $mode : 'people',
         'buffer_target' => $target >= BUFFER_TARGET_MIN && $target <= BUFFER_TARGET_MAX ? $target : BUFFER_TARGET_DEFAULT,
         'kk_ratio' => $kk >= 0 && $kk <= KK_RATIO_MAX ? $kk : 0,
@@ -421,7 +422,7 @@ function queue_maybe_kick(?callable $fire = null, ?int $now = null): void
             $today = array_values(array_filter((array) ($s['auto_started'] ?? []), fn($t) => $now - (int) $t < 86400));
             [$due, $refilling] = autopilot_due(!empty($s['buffer_refill']));
             $s['buffer_refill'] = $refilling;
-            $ok = $cfg['autopilot'] && $cfg['ready'] && count($today) < AUTOPILOT_MAX_PER_DAY && $due;
+            $ok = $cfg['autopilot'] && $cfg['ready'] && count($today) < autopilot_max_per_day($cfg['per_week']) && $due;
             if ($ok) $s['auto_started'] = [...$today, $now];
             queue_save($s);
             return $ok;

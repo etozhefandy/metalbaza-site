@@ -274,7 +274,7 @@ try {
         $d = body();
         $s = settings();
         if (array_key_exists('on', $d)) $s['autopost'] = (bool) $d['on'];
-        if (isset($d['per_week']) && isset(SLOT_DAYS[(int) $d['per_week']])) $s['per_week'] = (int) $d['per_week'];
+        if (isset($d['per_week']) && slot_plan((int) $d['per_week']) !== null) $s['per_week'] = (int) $d['per_week'];
         if (isset($d['image_mode']) && in_array($d['image_mode'], IMG_MODES, true)) $s['image_mode'] = $d['image_mode'];
         if (isset($d['buffer_target'])) {
             $t = (int) $d['buffer_target'];
