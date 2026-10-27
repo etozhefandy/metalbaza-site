@@ -115,7 +115,9 @@ body.home-leads #list-card, body.home-leads #new-card, body.home-leads #seo-card
 .geo-row q { display: block; color: var(--ink-2); font-size: 13px; margin-top: 4px; }
 ol.steps { margin: 8px 0; padding-left: 20px; display: grid; gap: 6px; font-size: 14px; }
 @media (max-width: 700px) { .kpis { grid-template-columns: 1fr 1fr 1fr; gap: 6px; } .kpi { padding: 8px; } .kpi b { font-size: 17px; } }
-@media (max-width: 700px) { .tabs-top { order: 5; width: 100%; } .tabs-top button { flex: 1; } .tabs-top #nav-count { display: none; } }
+/* кнопки вкладок не сжать до ширины текста (white-space:nowrap у .tabs-top button) — flex:1 с этим раньше
+   не умещался и толкал всю страницу вбок; вместо переноса сама полоска вкладок прокручивается по горизонтали */
+@media (max-width: 700px) { .tabs-top { order: 5; width: 100%; overflow-x: auto; -webkit-overflow-scrolling: touch; } .tabs-top button { flex: none; } .tabs-top #nav-count { display: none; } }
 .seg { display: inline-flex; border: 1px solid var(--line-2); border-radius: var(--r); overflow: hidden; margin-bottom: 14px; }
 .seg button { border: 0; background: #fff; padding: 8px 14px; font-size: 14px; cursor: pointer; color: var(--ink-2); }
 .seg button + button { border-left: 1px solid var(--line-2); }
@@ -196,6 +198,10 @@ details.more input { margin-top: 8px; }
 @media (max-width: 700px) {
   body { font-size: 16px; }
   input[type=text], input[type=password], input[type=number], input[type=datetime-local], select, textarea { font-size: 16px; }
+  /* label.f.inline select обычно узкий под свой текст (width:auto) — у «Ритм» длинные варианты (14 в неделю…)
+     раздвигали его шире экрана и уводили всю карточку вбок; на телефоне такой select — на своей строке, во всю ширину */
+  label.f.inline { flex-wrap: wrap; }
+  label.f.inline select { width: 100%; flex: 1 1 100%; }
   .top { padding: 10px 12px; gap: 8px; }
   .top h1 { font-size: 15px; }
   .top .btn { flex: 1; justify-content: center; padding: 8px 10px; }
@@ -350,6 +356,7 @@ body:not(.view-edit) .mbar { display: none !important; }
         <label class="f inline">Обложка<select id="ap-mode"><option value="people">с людьми</option><option value="auto">авто</option><option value="abstract">без людей</option></select></label>
         <label class="f inline" title="Сколько готовых статей (текст и обложка, ждут своего дня) держать про запас"><input type="number" id="ap-buffer" min="3" max="60" step="1" style="width:64px"> про запас</label>
         <label class="f inline" title="Автопилот и пачка выбранных тем будут иногда сами писать статью на казахском — случайно, в среднем такая доля"><input type="number" id="ap-kk" min="0" max="100" step="5" style="width:56px">% на казахском</label>
+        <button class="btn btn-p" id="ap-apply" style="display:none">Применить</button>
       </div>
       <p class="hint" id="q-buffer-status" style="margin:8px 0 0"></p>
       <ul class="qlist" id="q-list"></ul>
@@ -676,9 +683,11 @@ function qStatus(it) {
   return `текст ${Q_ICON[t.text.state]} · обложка ${Q_ICON[t.cover.state]}`;
 }
 function renderQueue(d) {
-  $("ap-on").checked = d.autopilot; $("ap-week").value = String(d.per_week); $("ap-mode").value = d.image_mode;
+  $("ap-on").checked = d.autopilot; $("ap-mode").value = d.image_mode;
+  // пока не нажали «Применить» (кнопка видна) — опрос очереди не должен тихо затирать несохранённый выбор
+  if ($("ap-apply").style.display === "none") $("ap-week").value = String(d.per_week);
   if (document.activeElement !== $("ap-buffer")) $("ap-buffer").value = d.buffer_target;
-  if (document.activeElement !== $("ap-kk")) $("ap-kk").value = d.kk_ratio;
+  if (document.activeElement !== $("ap-kk") && $("ap-apply").style.display === "none") $("ap-kk").value = d.kk_ratio;
   $("q-count").textContent = d.pending ? `· пишется ${d.pending}` : "";
   $("q-buffer-status").textContent = d.autopilot
     ? `Запас: ${d.ready} из ${d.buffer_target} готово` + (d.refilling ? " · пополняет" : d.ready >= d.buffer_target ? " · запас полный" : "")
@@ -723,15 +732,20 @@ $("q-list").onclick = async e => {
 };
 const apSave = body => api(BASE + "/api/autopilot", {method: "POST", body: JSON.stringify(body)}).then(renderQueue).catch(e => toast(e.message, true));
 $("ap-on").onchange = () => { apSave({on: $("ap-on").checked}); toast($("ap-on").checked ? "Автопилот включён: будет держать запас готовых статей и дописывать его, когда он просядет" : "Автопилот выключен"); };
-$("ap-week").onchange = () => { try { localStorage.setItem("per_week", $("ap-week").value); } catch (e) {} $("i-week").value = $("ap-week").value; apSave({per_week: +$("ap-week").value}); loadTopics(); };
+// Ритм и % на казахском не сохраняются сами по себе — только по кнопке «Применить» (видна, пока есть несохранённый выбор)
+const apShowApply = () => { $("ap-apply").style.display = "inline-flex"; };
+$("ap-week").onchange = () => { try { localStorage.setItem("per_week", $("ap-week").value); } catch (e) {} $("i-week").value = $("ap-week").value; loadTopics(); apShowApply(); };
 $("ap-mode").onchange = () => { $("img-mode").value = $("ap-mode").value; apSave({image_mode: $("ap-mode").value}); };
 $("ap-buffer").onchange = () => {
   const n = Math.max(3, Math.min(60, +$("ap-buffer").value || 12));
   $("ap-buffer").value = n; apSave({buffer_target: n});
 };
-$("ap-kk").onchange = () => {
-  const n = Math.max(0, Math.min(100, +$("ap-kk").value || 0));
-  $("ap-kk").value = n; apSave({kk_ratio: n});
+$("ap-kk").onchange = apShowApply;
+$("ap-apply").onclick = () => {
+  const kk = Math.max(0, Math.min(100, +$("ap-kk").value || 0));
+  $("ap-kk").value = kk;
+  $("ap-apply").style.display = "none";
+  apSave({per_week: +$("ap-week").value, kk_ratio: kk}).then(() => toast("Применено"));
 };
 loadQueue();
 // ---------- журнал заявок
