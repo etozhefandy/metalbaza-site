@@ -279,6 +279,7 @@ try {
     if ($method === 'POST' && $route === 'api/autopilot') {
         $d = body();
         $s = settings();
+        $old_week = (int) ($s['per_week'] ?? 2);
         if (array_key_exists('on', $d)) $s['autopost'] = (bool) $d['on'];
         if (isset($d['per_week']) && slot_plan((int) $d['per_week']) !== null) $s['per_week'] = (int) $d['per_week'];
         if (isset($d['image_mode']) && in_array($d['image_mode'], IMG_MODES, true)) $s['image_mode'] = $d['image_mode'];
@@ -293,8 +294,10 @@ try {
             $s['kk_ratio'] = $k;
         }
         save_settings($s);
+        // ритм поменялся — уже запланированные статьи (кроме ближайшей) переставляем под новый, а не оставляем вразнобой
+        $moved = (int) $s['per_week'] !== $old_week ? reschedule_queue((int) $s['per_week']) : 0;
         if (!empty($d['on'])) { $q = queue_state(); $q['checked'] = 0; queue_save($q); queue_maybe_kick(); }
-        reply(queue_view());
+        reply(($moved ? ['rescheduled' => $moved] : []) + queue_view());
     }
     if ($method === 'GET' && $route === 'api/leads') {
         $months = lead_months();

@@ -745,7 +745,14 @@ $("ap-apply").onclick = () => {
   const kk = Math.max(0, Math.min(100, +$("ap-kk").value || 0));
   $("ap-kk").value = kk;
   $("ap-apply").style.display = "none";
-  apSave({per_week: +$("ap-week").value, kk_ratio: kk}).then(() => toast("Применено"));
+  api(BASE + "/api/autopilot", {method: "POST", body: JSON.stringify({per_week: +$("ap-week").value, kk_ratio: kk})})
+    .then(d => {
+      renderQueue(d);
+      loadTopics();
+      if (d.rescheduled) load(undefined).catch(() => {});
+      toast(d.rescheduled ? `Применено: план переставлен под новый ритм (${d.rescheduled})` : "Применено");
+    })
+    .catch(e => toast(e.message, true));
 };
 loadQueue();
 // ---------- журнал заявок

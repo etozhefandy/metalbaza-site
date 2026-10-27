@@ -66,6 +66,44 @@ function queue_settings(): array
         'ready' => trim((string) ($s['anthropic_key'] ?? '')) !== '' && trim((string) ($s['openai_key'] ?? '')) !== ''];
 }
 
+/** Ритм изменился — переставить уже запланированные статьи под новый ритм, все кроме ближайшей (её не трогаем:
+ *  к её выходу уже могли готовиться — обложка, анонс и т.п.). Берём остальные по порядку дат и ставим на новые
+ *  слоты подряд сразу после ближайшей, иначе старые даты остаются вперемешку со старым ритмом. → сколько сдвинуто. */
+function reschedule_queue(int $per_week, ?DateTimeImmutable $now = null): int
+{
+    $slots = slot_plan($per_week);
+    if (!$slots) return 0;
+    $now ??= now();
+    $scheduled = array_values(array_filter(load_all(), function ($a) use ($now) {
+        if (($a['status'] ?? '') !== 'scheduled') return false;
+        $dt = parse_dt($a['publish_at'] ?? '');
+        return $dt && $dt > $now;
+    }));
+    if (count($scheduled) < 2) return 0;
+    usort($scheduled, fn($a, $b) => strcmp($a['publish_at'], $b['publish_at']));
+    $after = parse_dt($scheduled[0]['publish_at']);
+    $moved = [];
+    for ($i = 1; $i < count($scheduled); $i++) {
+        $after = slot_after($after, $slots, []);
+        if (!$after) break;
+        $a = $scheduled[$i];
+        $new = $after->format('Y-m-d\TH:i');
+        if ($a['publish_at'] !== $new) {
+            $a['publish_at'] = $new;
+            save_article($a, $a['slug']);
+            $moved[$a['slug']] = $new;
+        }
+    }
+    if ($moved) {
+        $s = queue_state();
+        foreach ($s['items'] ?? [] as $i => $it) {
+            if (isset($moved[$it['slug'] ?? ''])) $s['items'][$i]['publish_at'] = $moved[$it['slug']];
+        }
+        queue_save($s);
+    }
+    return count($moved);
+}
+
 /** Язык новой статьи, которую сам выбирает автопилот/пачка тем: случайно, по настроенной доле на казахском. */
 function queue_pick_lang(): string
 {
