@@ -356,7 +356,7 @@ body:not(.view-edit) .mbar { display: none !important; }
         <label class="f inline">Обложка<select id="ap-mode"><option value="people">с людьми</option><option value="auto">авто</option><option value="abstract">без людей</option></select></label>
         <label class="f inline" title="Сколько готовых статей (текст и обложка, ждут своего дня) держать про запас"><input type="number" id="ap-buffer" min="3" max="60" step="1" style="width:64px"> про запас</label>
         <label class="f inline" title="Автопилот и пачка выбранных тем будут иногда сами писать статью на казахском — случайно, в среднем такая доля"><input type="number" id="ap-kk" min="0" max="100" step="5" style="width:56px">% на казахском</label>
-        <button class="btn btn-p" id="ap-apply" style="display:none">Применить</button>
+        <button class="btn btn-p" id="ap-apply" disabled title="Нет несохранённых изменений ритма или доли на казахском">Применить</button>
       </div>
       <p class="hint" id="q-buffer-status" style="margin:8px 0 0"></p>
       <ul class="qlist" id="q-list"></ul>
@@ -684,10 +684,10 @@ function qStatus(it) {
 }
 function renderQueue(d) {
   $("ap-on").checked = d.autopilot; $("ap-mode").value = d.image_mode;
-  // пока не нажали «Применить» (кнопка видна) — опрос очереди не должен тихо затирать несохранённый выбор
-  if ($("ap-apply").style.display === "none") $("ap-week").value = String(d.per_week);
+  // пока «Применить» не нажали (активна) — опрос очереди не должен тихо затирать несохранённый выбор
+  if ($("ap-apply").disabled) $("ap-week").value = String(d.per_week);
   if (document.activeElement !== $("ap-buffer")) $("ap-buffer").value = d.buffer_target;
-  if (document.activeElement !== $("ap-kk") && $("ap-apply").style.display === "none") $("ap-kk").value = d.kk_ratio;
+  if (document.activeElement !== $("ap-kk") && $("ap-apply").disabled) $("ap-kk").value = d.kk_ratio;
   $("q-count").textContent = d.pending ? `· пишется ${d.pending}` : "";
   $("q-buffer-status").textContent = d.autopilot
     ? `Запас: ${d.ready} из ${d.buffer_target} готово` + (d.refilling ? " · пополняет" : d.ready >= d.buffer_target ? " · запас полный" : "")
@@ -732,8 +732,8 @@ $("q-list").onclick = async e => {
 };
 const apSave = body => api(BASE + "/api/autopilot", {method: "POST", body: JSON.stringify(body)}).then(renderQueue).catch(e => toast(e.message, true));
 $("ap-on").onchange = () => { apSave({on: $("ap-on").checked}); toast($("ap-on").checked ? "Автопилот включён: будет держать запас готовых статей и дописывать его, когда он просядет" : "Автопилот выключен"); };
-// Ритм и % на казахском не сохраняются сами по себе — только по кнопке «Применить» (видна, пока есть несохранённый выбор)
-const apShowApply = () => { $("ap-apply").style.display = "inline-flex"; };
+// Ритм и % на казахском не сохраняются сами по себе — только по кнопке «Применить» (активна, пока есть несохранённый выбор)
+const apShowApply = () => { $("ap-apply").disabled = false; };
 $("ap-week").onchange = () => { try { localStorage.setItem("per_week", $("ap-week").value); } catch (e) {} $("i-week").value = $("ap-week").value; loadTopics(); apShowApply(); };
 $("ap-mode").onchange = () => { $("img-mode").value = $("ap-mode").value; apSave({image_mode: $("ap-mode").value}); };
 $("ap-buffer").onchange = () => {
@@ -744,7 +744,7 @@ $("ap-kk").onchange = apShowApply;
 $("ap-apply").onclick = () => {
   const kk = Math.max(0, Math.min(100, +$("ap-kk").value || 0));
   $("ap-kk").value = kk;
-  $("ap-apply").style.display = "none";
+  $("ap-apply").disabled = true;
   api(BASE + "/api/autopilot", {method: "POST", body: JSON.stringify({per_week: +$("ap-week").value, kk_ratio: kk})})
     .then(d => {
       renderQueue(d);
