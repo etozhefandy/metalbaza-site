@@ -375,7 +375,11 @@ function queue_finish(array $item): void
 /** Первая новая тема из списка, которой ещё нет в очереди; список пуст — подбираем по спросу. */
 function queue_pick_topic(int $per_week, ?callable $post = null): ?array
 {
-    $taken = array_filter(array_column(array_filter(queue_state()['items'] ?? [], 'queue_open'), 'topic_key'));
+    // не только то, что сейчас пишется, но и уже написанное (из последних QUEUE_KEEP) — статья по теме не
+    // всегда повторяет её main_keyword в своих ключевых словах дословно, поэтому проверка topics_view() «used»
+    // (по пересечению ключевых слов) иногда такую тему пропускает, и её можно взять в работу второй раз;
+    // ошибки и отменённые — не в счёт, тему можно попробовать снова
+    $taken = array_filter(array_column(array_filter(queue_state()['items'] ?? [], fn($it) => queue_open($it) || $it['stage'] === 'done'), 'topic_key'));
     $pick = function () use ($per_week, $taken) {
         foreach (topics_view($per_week)['topics'] as $t) {
             if (empty($t['used']) && ($t['status'] ?? 'new') === 'new' && !in_array(topic_key($t), $taken, true)) return $t;
