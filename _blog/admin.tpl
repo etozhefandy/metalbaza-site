@@ -689,6 +689,10 @@ function renderQueue(d) {
   if (document.activeElement !== $("ap-buffer")) $("ap-buffer").value = d.buffer_target;
   if (document.activeElement !== $("ap-kk") && $("ap-apply").disabled) $("ap-kk").value = d.kk_ratio;
   $("q-count").textContent = d.pending ? `· пишется ${d.pending}` : "";
+  // модель меняется сразу для следующего запроса к Claude — но пока статья пишется, трогать её не даём: не
+  // потому что это что-то сломает, а чтобы не было сюрпризов, какой моделью в итоге дописалась уже начатая
+  $("s-model").disabled = !!d.pending;
+  $("s-model").title = d.pending ? "Сейчас пишется статья — поменяйте модель, когда очередь освободится" : "";
   $("q-buffer-status").textContent = d.autopilot
     ? `Запас: ${d.ready} из ${d.buffer_target} готово` + (d.refilling ? " · пополняет" : d.ready >= d.buffer_target ? " · запас полный" : "")
     : "";
