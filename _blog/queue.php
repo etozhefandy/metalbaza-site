@@ -425,6 +425,22 @@ function queue_notify(array $a, bool $cover): void
 
 // ---------------------------------------------------------------- пинки и автопилот
 
+/** Черновик — уже написанная вручную статья, просто без даты выхода. Если запас просел (см. autopilot_due),
+ *  сначала бесплатно разбираем черновики — без ИИ, без ключей, даже если автопилот выключен — и только когда
+ *  они закончились, подключаем автопилот. Берём самый старый черновик и ставим на ближайший свободный день
+ *  по ритму — так несколько черновиков разойдутся по плану постепенно, а не все сразу. → продвинутая статья
+ *  или null, если черновиков нет. */
+function promote_draft(int $per_week): ?array
+{
+    $drafts = array_values(array_filter(load_all(), fn($a) => ($a['status'] ?? '') === 'draft'));
+    if (!$drafts) return null;
+    usort($drafts, fn($a, $b) => strcmp($a['created_at'] ?: $a['slug'], $b['created_at'] ?: $b['slug']));
+    $a = $drafts[0];
+    $a['status'] = 'scheduled';
+    $a['publish_at'] = next_free_slot($per_week, $a['slug']);
+    return save_article($a, $a['slug']);
+}
+
 /** Сколько статей по-настоящему готовы ждать своего дня: запланированные, с текстом и обложкой. Без обложки —
  *  такое бывает, если OpenAI подвёл (queue_finish всё равно её публикует), но «про запас» это не считаем. */
 function autopilot_ready_count(?DateTimeImmutable $at = null): int
@@ -453,19 +469,22 @@ function queue_maybe_kick(?callable $fire = null, ?int $now = null): void
     $now ??= time();
     $s = queue_state();
     if ($now - (int) ($s['checked'] ?? 0) >= AUTOPILOT_CHECK_EVERY) {
-        $add = queue_locked(function () use ($now) {
+        [$add, $promoted] = queue_locked(function () use ($now) {
             $s = queue_state();
             $s['checked'] = $now;
             $cfg = queue_settings();
             $today = array_values(array_filter((array) ($s['auto_started'] ?? []), fn($t) => $now - (int) $t < 86400));
             [$due, $refilling] = autopilot_due(!empty($s['buffer_refill']));
             $s['buffer_refill'] = $refilling;
-            $ok = $cfg['autopilot'] && $cfg['ready'] && count($today) < autopilot_max_per_day($cfg['per_week']) && $due;
+            // запас просел — сперва бесплатно разбираем черновики; автопилот (ИИ) подключаем только когда их не осталось
+            $promoted = $due ? promote_draft($cfg['per_week']) : null;
+            $ok = !$promoted && $cfg['autopilot'] && $cfg['ready'] && count($today) < autopilot_max_per_day($cfg['per_week']) && $due;
             if ($ok) $s['auto_started'] = [...$today, $now];
             queue_save($s);
-            return $ok;
+            return [$ok, $promoted];
         });
         if ($add) queue_add(['origin' => 'auto']);
+        if ($promoted) queue_notify($promoted, $promoted['cover_path'] !== '');
         $s = queue_state();
     }
     if ($now - (int) ($s['kicked'] ?? 0) < QUEUE_KICK_EVERY) return;
