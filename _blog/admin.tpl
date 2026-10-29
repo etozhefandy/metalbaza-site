@@ -442,11 +442,11 @@ body:not(.view-edit) .mbar { display: none !important; }
     <section class="card">
       <h2>Ключи ИИ <small>хранятся на хостинге вне сайта, в браузер не возвращаются</small></h2>
       <div class="grid">
-        <label class="f">Ключ Claude (статьи и идеи тем) <span class="hint" id="s-ant-cur"></span>
+        <label class="f">Ключ Claude (статьи и идеи тем) <span class="hint" id="s-ant-cur"></span> <span class="hint" id="s-ant-ok" style="color:var(--ok);display:none">✓ введено, не сохранено</span>
           <input type="password" id="s-ant" placeholder="sk-ant-…" autocomplete="off" spellcheck="false"></label>
-        <label class="f">Ключ OpenAI (картинки) <span class="hint" id="s-oai-cur"></span>
+        <label class="f">Ключ OpenAI (картинки) <span class="hint" id="s-oai-cur"></span> <span class="hint" id="s-oai-ok" style="color:var(--ok);display:none">✓ введено, не сохранено</span>
           <input type="password" id="s-oai" placeholder="sk-…" autocomplete="off" spellcheck="false"></label>
-        <label class="f">Учёт трат Claude (строка из бота) <span class="hint" id="s-spend-cur"></span>
+        <label class="f">Учёт трат Claude (строка из бота) <span class="hint" id="s-spend-cur"></span> <span class="hint" id="s-spend-ok" style="color:var(--ok);display:none">✓ введено, не сохранено</span>
           <input type="password" id="s-spend" placeholder="https://…/api/public/ai-spend#aisp_…" autocomplete="off" spellcheck="false"></label>
         <p class="hint">Пустое поле — ключ не меняется. Ключи берутся на console.anthropic.com и platform.openai.com → API keys.
           Строка учёта — в боте: «💰 Балансы API» → Claude → «🔌 Подключить проект»; бот покажет, сколько тратит этот сайт. «off» — отключить.</p>
@@ -1431,6 +1431,10 @@ $("tg-unlink").onclick = async () => {
 $("b-settings").onclick = () => { showSettings(); tgStatus(); };
 $("keys-link").onclick = e => { e.preventDefault(); showSettings(); tgStatus(); };
 $("s-back").onclick = () => { document.body.classList.remove("view-settings"); checkKeys(); };
+// поля ключей — password, дотсы не показывают, ввелось ли что-то; явная галочка снимает сомнение
+["s-ant", "s-oai", "s-spend"].forEach(id => {
+  $(id).oninput = () => { $(id + "-ok").style.display = $(id).value ? "" : "none"; };
+});
 $("s-model").onchange = async () => {
   try {
     const d = await api(BASE + "/api/settings", {method: "POST", body: JSON.stringify({claude_model: $("s-model").value})});
@@ -1446,6 +1450,7 @@ $("s-save").onclick = async () => {
       anthropic_key: $("s-ant").value, openai_key: $("s-oai").value, spend_link: $("s-spend").value,
       password_current: $("s-pass-cur").value, password_new: $("s-pass-new").value})});
     ["s-ant", "s-oai", "s-spend", "s-pass-cur", "s-pass-new"].forEach(id => { $(id).value = ""; });
+    ["s-ant", "s-oai", "s-spend"].forEach(id => { $(id + "-ok").style.display = "none"; });
     toast(d.changed.length ? "Сохранено: " + d.changed.join(", ") : "Ничего не изменилось");
     await showSettings();
   } catch (e) { toast(e.message, true); }
