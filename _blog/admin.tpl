@@ -363,8 +363,9 @@ body:not(.view-edit) .mbar { display: none !important; }
         <button class="btn btn-p" id="ap-apply" disabled title="Нет несохранённых изменений ритма или доли на казахском">Применить</button>
       </div>
       <p class="hint" id="q-buffer-status" style="margin:8px 0 0"></p>
+      <p class="hint" id="q-cover-status" style="margin:4px 0 0"></p>
       <ul class="qlist" id="q-list"></ul>
-      <p class="hint" id="q-hint" style="margin:8px 0 0">Сюда попадает каждая статья, которую вы отправили писать: текст и обложка готовятся одновременно на сервере (страницу можно закрыть), затем статья сама встаёт на ближайший свободный день по ритму, 10:00. Автопилот держит запас готовых статей: просел до ¼ от цели — по пятницам дописывает пачкой (не быстрее нескольких в день) на неделю вперёд, пока не наберёт полный запас снова, остальные дни молчит.</p>
+      <p class="hint" id="q-hint" style="margin:8px 0 0">Сюда попадает каждая статья, которую вы отправили писать: текст и обложка готовятся одновременно на сервере (страницу можно закрыть), затем статья сама встаёт на ближайший свободный день по ритму, 10:00. Автопилот держит запас готовых статей: если на ближайшую неделю вообще ничего не запланировано — по пятницам дописывает пачкой (не быстрее нескольких в день), пока не наберёт полный запас, остальное время молчит.</p>
     </section>
     <section class="card" id="list-card">
       <div class="row" style="margin-bottom:14px">
@@ -700,6 +701,10 @@ function renderQueue(d) {
   $("q-buffer-status").textContent = d.autopilot
     ? `Запас: ${d.ready} из ${d.buffer_target} готово` + (d.refilling ? " · пополняет" : d.ready >= d.buffer_target ? " · запас полный" : "")
     : "";
+  // рисовка обложек — отдельный тихий механизм (не через очередь выше), поэтому без этой строки его не видно
+  $("q-cover-status").textContent = !d.covers_missing ? "" : d.covers_stuck
+    ? `🖼 ${d.covers_missing} статьям не хватает обложки, у ${d.covers_stuck} закончились попытки — дорисуйте вручную в статье («Сгенерировать (ИИ)»)`
+    : `🖼 ${d.covers_missing} статьям не хватает обложки — дорисовываются в фоне`;
   // ближайшая дата выхода — сверху; у ещё не готовых даты нет, их показываем первыми (над ними уже идёт работа)
   const items = d.items.filter(it => it.stage !== "cancelled").sort((a, b) => (a.publish_at || "").localeCompare(b.publish_at || "")).slice(0, 8);
   $("q-list").innerHTML = items.map(it => `<li class="${it.stage}"><b>${esc(it.title || it.topic || (it.origin === "auto" ? "Автопилот подбирает тему" : "Статья по источнику"))}</b>

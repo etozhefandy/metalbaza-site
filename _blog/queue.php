@@ -10,12 +10,12 @@
 // повторяется (2 попытки). Cron не нужен: заходы на сайт и админка «пинают» очередь.
 //
 // Автопилот — тумблер поверх очереди: держит запас готовых статей (текст + обложка, ждут своего дня по ритму
-// выхода). Запас — не «подливаем по одной на каждый чих»: пока его хватает (выше низкой отметки, ¼ от цели),
-// автопилот молчит; просел до низкой — пишет пачкой, пока не наберёт полный запас снова (но не быстрее
-// autopilot_max_per_day() в день — растёт вместе с ритмом выхода, это и есть «подстраивается под темп»,
-// большой недобор не пишется за один присест). Новые статьи (расход ИИ) автопилот заводит только по пятницам
-// (AUTOPILOT_WRITE_DAY) — раз в неделю, пачкой на неделю вперёд, а не понемногу каждый день без остановки;
-// остальные дни просто молчит, даже если запас просел.
+// выхода). Пополнение (гистерезис, чтобы не подливать по одной на каждый чих) начинаем, только если на
+// ближайшую неделю вообще ничего не запланировано (week_ahead_count), — а не просто «запас чуть просел»; дальше
+// пишет пачкой, пока не наберёт полный запас снова (но не быстрее autopilot_max_per_day() в день — растёт вместе
+// с ритмом выхода, большой недобор не пишется за один присест), пока план снова не опустеет — молчит. Новые
+// статьи (расход ИИ) вдобавок заводятся только по пятницам (AUTOPILOT_WRITE_DAY) — раз в неделю, пачкой на
+// неделю вперёд, а не понемногу каждый день.
 // Ритм выхода (per_week) этим не затрагивается: он только расставляет готовые статьи по дням, запас может
 // растянуться на много недель вперёд.
 //
@@ -518,16 +518,29 @@ function autopilot_ready_count(?DateTimeImmutable $at = null): int
     return count(array_filter(load_all(), fn($a) => state($a, $at) === 'scheduled' && $a['cover_path'] !== ''));
 }
 
+/** Сколько статей уже запланировано на ближайшие 7 дней — не важно, есть ли у них обложка: место в плане уже
+ *  занято. Это и есть «неделя вперёд» из autopilot_due — не «готово» (как autopilot_ready_count), а «стоит в
+ *  календаре». */
+function week_ahead_count(?DateTimeImmutable $at = null): int
+{
+    $at ??= now();
+    $until = $at->modify('+7 days');
+    return count(array_filter(load_all(), function ($a) use ($at, $until) {
+        if (($a['status'] ?? '') !== 'scheduled') return false;
+        $dt = parse_dt($a['publish_at'] ?? '');
+        return $dt && $dt >= $at && $dt < $until;
+    }));
+}
+
 /** Нужна ли ещё статья и остаёмся ли «в пополнении» (гистерезис, чтобы не подливать по одной на каждый чих):
- *  просел запас (готовые + уже пишутся) до низкой отметки — пополняем пачкой, пока не наберём цель снова; между
- *  низкой отметкой и целью автопилот молчит. $refilling — текущий флаг (queue_state()['buffer_refill']).
- *  → [нужна статья сейчас?, новое значение флага]. */
+ *  пополнение начинаем, только если на ближайшую неделю вообще ничего не запланировано (а не «чуть просело») —
+ *  и пишем пачкой, пока не наберём полный запас снова; дальше, пока план не опустеет совсем, автопилот молчит.
+ *  $refilling — текущий флаг (queue_state()['buffer_refill']). → [нужна статья сейчас?, новое значение флага]. */
 function autopilot_due(bool $refilling, ?DateTimeImmutable $at = null): array
 {
     $target = queue_settings()['buffer_target'];
-    $low = max(1, (int) round($target / 4));
     $total = autopilot_ready_count($at) + count(array_filter(queue_state()['items'] ?? [], 'queue_open'));
-    if (!$refilling && $total <= $low) $refilling = true;
+    if (!$refilling && week_ahead_count($at) === 0) $refilling = true;
     if ($refilling && $total >= $target) $refilling = false;
     return [$refilling && $total < $target, $refilling];
 }
@@ -536,22 +549,23 @@ function autopilot_due(bool $refilling, ?DateTimeImmutable $at = null): array
 function queue_maybe_kick(?callable $fire = null, ?int $now = null): void
 {
     $now ??= time();
+    $at = (new DateTimeImmutable('@' . $now))->setTimezone(tz());   // та же точка отсчёта для «через 10 минут» и для «неделя вперёд»
     $s = queue_state();
     $coverFire = false;
     if ($now - (int) ($s['checked'] ?? 0) >= AUTOPILOT_CHECK_EVERY) {
-        [$add, $promoted, $coverFire] = queue_locked(function () use ($now) {
+        [$add, $promoted, $coverFire] = queue_locked(function () use ($now, $at) {
             $s = queue_state();
             $s['checked'] = $now;
             $s['secret'] ??= bin2hex(random_bytes(16));
             $cfg = queue_settings();
             $today = array_values(array_filter((array) ($s['auto_started'] ?? []), fn($t) => $now - (int) $t < 86400));
-            [$due, $refilling] = autopilot_due(!empty($s['buffer_refill']));
+            [$due, $refilling] = autopilot_due(!empty($s['buffer_refill']), $at);
             $s['buffer_refill'] = $refilling;
-            // запас просел — сперва бесплатно разбираем черновики; автопилот (ИИ) подключаем только когда их не осталось
+            // план на неделю просел — сперва бесплатно разбираем черновики; автопилот (ИИ) подключаем только когда их не осталось
             $promoted = $due ? promote_draft($cfg['per_week']) : null;
             // новые (платные) статьи заводим только в свой день недели — раз в неделю пачкой на неделю вперёд,
             // а не понемногу каждый день; черновики (строкой выше) это не ограничивает — им ИИ не нужен
-            $writeDay = (int) (new DateTimeImmutable('@' . $now))->setTimezone(tz())->format('N') === AUTOPILOT_WRITE_DAY;
+            $writeDay = (int) $at->format('N') === AUTOPILOT_WRITE_DAY;
             $ok = !$promoted && $cfg['autopilot'] && $cfg['ready'] && count($today) < autopilot_max_per_day($cfg['per_week']) && $due && $writeDay;
             if ($ok) $s['auto_started'] = [...$today, $now];
             queue_save($s);
@@ -568,11 +582,17 @@ function queue_maybe_kick(?callable $fire = null, ?int $now = null): void
     queue_fire_free($fire);
 }
 
-/** Для админки: очередь (новые сверху), настройки и запас (сколько готово из скольких держим целью). */
+/** Для админки: очередь (новые сверху), настройки, запас (сколько готово из скольких держим целью) и сколько
+ *  статей сейчас без обложки (дорисовываются в фоне, см. cover_backfill_* — в самой очереди их не видно, так
+ *  как это не задача очереди, а отдельный, тихий пинок на cover-tick.php). */
 function queue_view(): array
 {
     $items = array_reverse(queue_state()['items'] ?? []);
     $pending = count(array_filter($items, 'queue_open'));
+    $tries = (array) (queue_state()['cover_tries'] ?? []);
+    $covers = array_values(array_filter(load_all(), fn($a) => $a['status'] === 'scheduled' && $a['cover_path'] === ''));
     return queue_settings() + ['items' => array_slice($items, 0, 20), 'pending' => $pending,
-        'ready' => autopilot_ready_count(), 'refilling' => !empty(queue_state()['buffer_refill'])];
+        'ready' => autopilot_ready_count(), 'refilling' => !empty(queue_state()['buffer_refill']),
+        'covers_missing' => count($covers),
+        'covers_stuck' => count(array_filter($covers, fn($a) => (int) ($tries[$a['slug']] ?? 0) >= COVER_RETRY_MAX))];
 }
