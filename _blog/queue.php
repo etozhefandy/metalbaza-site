@@ -16,6 +16,12 @@
 // большой недобор не пишется за один присест).
 // Ритм выхода (per_week) этим не затрагивается: он только расставляет готовые статьи по дням, запас может
 // растянуться на много недель вперёд.
+//
+// Черновики (написаны вручную, без даты) запас тоже пополняют — бесплатно, раньше, чем позвать автопилот
+// (promote_draft). А если у уже запланированной статьи почему-то нет обложки (OpenAI подвёл при записи) —
+// пробуем дорисовать в фоне, отдельными пинками на /api/cover-tick.php, и только пока есть что дорисовывать
+// (cover_backfill_pending/claim/run) — не блокируя посетителя сайта и не долбя без остановки: на одну статью
+// не больше COVER_RETRY_MAX попыток, дальше — руками в админке.
 declare(strict_types=1);
 require_once __DIR__ . '/ai.php';
 require_once dirname(__DIR__) . '/api/_tg.php';
@@ -275,9 +281,9 @@ function queue_fire_free(?callable $fire = null): void
     for ($k = 0; $k < $n; $k++) queue_fire($s['secret'], $fire);
 }
 
-function queue_fire(string $secret, ?callable $fire = null): void
+function queue_fire(string $secret, ?callable $fire = null, string $endpoint = 'queue-tick.php'): void
 {
-    $url = parts()['site_url'] . '/api/queue-tick.php?k=' . $secret;
+    $url = parts()['site_url'] . "/api/$endpoint?k=" . $secret;
     if ($fire) { $fire($url); return; }
     $ch = curl_init($url);
     curl_setopt_array($ch, [CURLOPT_RETURNTRANSFER => true, CURLOPT_TIMEOUT_MS => 1500, CURLOPT_NOSIGNAL => true, CURLOPT_CONNECTTIMEOUT_MS => 1000]);
@@ -445,6 +451,62 @@ function promote_draft(int $per_week): ?array
     return save_article($a, $a['slug']);
 }
 
+const COVER_RETRY_MAX = 3;   // сколько раз подряд пробуем дорисовать одну статью, прежде чем оставить в покое
+
+/** Есть ли вообще смысл пинать cover-tick.php — статья без обложки, по которой ещё не исчерпали попытки.
+ *  Дёшево и без побочных эффектов (в отличие от cover_backfill_claim) — чтобы решить, нужен ли лишний пинок,
+ *  не занимая при этом саму попытку. */
+function cover_backfill_pending(): bool
+{
+    $tries = (array) (queue_state()['cover_tries'] ?? []);
+    foreach (load_all() as $a) {
+        if ($a['status'] === 'scheduled' && $a['cover_path'] === '' && (int) ($tries[$a['slug']] ?? 0) < COVER_RETRY_MAX) return true;
+    }
+    return false;
+}
+
+/** Статья без обложки (OpenAI подвёл при записи — такое бывает) — не бросаем так, пробуем дорисовать в фоне,
+ *  асинхронно: решает об этом queue_maybe_kick() (пинает cover-tick.php), сама рисовка — только там, в её
+ *  собственном запросе на хостинге, не блокируя посетителя сайта. Но не долбим без остановки: после нескольких
+ *  неудач для конкретной статьи — перестаём, дальше можно поправить в админке руками. Счётчик попыток —
+ *  в queue.json («cover_tries»), схему статьи не трогаем. → слаг или '' (нечего/хватит попыток). */
+function cover_backfill_claim(): string
+{
+    $s = queue_state();
+    $tries = (array) ($s['cover_tries'] ?? []);
+    $missing = array_values(array_filter(load_all(), fn($a) => $a['status'] === 'scheduled' && $a['cover_path'] === '' && (int) ($tries[$a['slug']] ?? 0) < COVER_RETRY_MAX));
+    if (!$missing) return '';
+    usort($missing, fn($a, $b) => strcmp($a['publish_at'], $b['publish_at']));   // ближайшая по выходу — первой
+    $slug = $missing[0]['slug'];
+    $tries[$slug] = (int) ($tries[$slug] ?? 0) + 1;
+    $s['cover_tries'] = $tries;
+    queue_save($s);
+    return $slug;
+}
+
+function cover_backfill_run(string $slug, string $image_mode, ?callable $post = null): ?array
+{
+    $a = get_article($slug);
+    if (!$a || $a['cover_path'] !== '') return null;
+    try {
+        $img = generate_image('cover', $a['title'], $a['lead'], '', $image_mode, ['summary' => $a['summary'], 'body' => $a['body_md']], $post);
+    } catch (AiError $ex) {
+        error_log('дорисовка обложки: ' . $ex->getMessage());
+        return null;
+    }
+    if (($img['bin'] ?? '') === '') return null;
+    $name = substr(slugify($a['title']), 0, 60) . '-cover-' . bin2hex(random_bytes(3)) . '.webp';
+    write_file(DATA_DIR . "/media/$name", $img['bin']);
+    $a['cover_path'] = "/blog/media/$name";
+    $saved = save_article($a, $slug);
+    queue_locked(function () use ($slug) {
+        $s = queue_state();
+        unset($s['cover_tries'][$slug]);
+        queue_save($s);
+    });
+    return $saved;
+}
+
 /** Сколько статей по-настоящему готовы ждать своего дня: запланированные, с текстом и обложкой. Без обложки —
  *  такое бывает, если OpenAI подвёл (queue_finish всё равно её публикует), но «про запас» это не считаем. */
 function autopilot_ready_count(?DateTimeImmutable $at = null): int
@@ -472,10 +534,12 @@ function queue_maybe_kick(?callable $fire = null, ?int $now = null): void
 {
     $now ??= time();
     $s = queue_state();
+    $coverFire = false;
     if ($now - (int) ($s['checked'] ?? 0) >= AUTOPILOT_CHECK_EVERY) {
-        [$add, $promoted] = queue_locked(function () use ($now) {
+        [$add, $promoted, $coverFire] = queue_locked(function () use ($now) {
             $s = queue_state();
             $s['checked'] = $now;
+            $s['secret'] ??= bin2hex(random_bytes(16));
             $cfg = queue_settings();
             $today = array_values(array_filter((array) ($s['auto_started'] ?? []), fn($t) => $now - (int) $t < 86400));
             [$due, $refilling] = autopilot_due(!empty($s['buffer_refill']));
@@ -485,12 +549,15 @@ function queue_maybe_kick(?callable $fire = null, ?int $now = null): void
             $ok = !$promoted && $cfg['autopilot'] && $cfg['ready'] && count($today) < autopilot_max_per_day($cfg['per_week']) && $due;
             if ($ok) $s['auto_started'] = [...$today, $now];
             queue_save($s);
-            return [$ok, $promoted];
+            // статьи без обложки — независимо от автопилота и запаса, но тоже не чаще раза в AUTOPILOT_CHECK_EVERY;
+            // саму рисовку не делаем прямо тут (посетитель сайта не должен ждать OpenAI) — только пинок, как и queue-tick
+            return [$ok, $promoted, $cfg['ready'] && cover_backfill_pending()];
         });
         if ($add) queue_add(['origin' => 'auto']);
         if ($promoted) queue_notify($promoted, $promoted['cover_path'] !== '');
         $s = queue_state();
     }
+    if ($coverFire && ($secret = (string) ($s['secret'] ?? '')) !== '') queue_fire($secret, $fire, 'cover-tick.php');
     if ($now - (int) ($s['kicked'] ?? 0) < QUEUE_KICK_EVERY) return;
     queue_fire_free($fire);
 }
