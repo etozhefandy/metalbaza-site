@@ -210,6 +210,10 @@ details.more input { margin-top: 8px; }
   .acards { grid-template-columns: 1fr; }
   .idea { flex-direction: column; gap: 10px; }
   .idea .btn { width: 100%; justify-content: center; }
+  /* .qlist li — строка очереди (заголовок + статус + модель + кнопка) в один ряд без переноса раздвигала
+     страницу шире экрана; на телефоне заголовок — на своей строке, остальное переносится под него */
+  .qlist li { flex-wrap: wrap; }
+  .qlist li b { flex-basis: 100%; }
   .row > .btn, .row > label.btn { flex: 1; justify-content: center; }
   textarea.body { min-height: 60vh; }
   .ebar { top: 0; position: static; flex-wrap: wrap; box-shadow: none; }
@@ -351,7 +355,7 @@ body:not(.view-edit) .mbar { display: none !important; }
       <div class="row" style="gap:10px;flex-wrap:wrap">
         <h2 style="margin:0">🧾 Очередь написания <small id="q-count"></small></h2>
         <span class="spacer"></span>
-        <label class="f inline" title="Сам пишет статьи с обложками, пока не наберёт запас на будущее"><input type="checkbox" id="ap-on"> 🤖 Автопилот</label>
+        <label class="f inline" title="Сам пишет статьи с обложками про запас — пачкой раз в неделю, по пятницам, пока не наберёт запас на будущее"><input type="checkbox" id="ap-on"> 🤖 Автопилот</label>
         <label class="f inline">Ритм<select id="ap-week"><option value="1">1 в неделю (вт)</option><option value="2">2 в неделю (вт, чт)</option><option value="3">3 в неделю (пн, ср, пт)</option><option value="4">4 в неделю (пн, ср, пт, вс)</option><option value="5">5 в неделю (будни)</option><option value="6">6 в неделю (пн–сб)</option><option value="7">7 в неделю (каждый день)</option><option value="8">8 в неделю (каждый день, пн — дважды)</option><option value="9">9 в неделю (каждый день, пн и ср — дважды)</option><option value="10">10 в неделю (каждый день, пн/ср/пт — дважды)</option><option value="11">11 в неделю (каждый день, пн/вт/ср/пт — дважды)</option><option value="12">12 в неделю (каждый день, кроме сб/вс, — дважды)</option><option value="13">13 в неделю (каждый день, кроме вс, — дважды)</option><option value="14">14 в неделю (каждый день дважды — утром и вечером)</option></select></label>
         <label class="f inline">Обложка<select id="ap-mode"><option value="people">с людьми</option><option value="auto">авто</option><option value="abstract">без людей</option></select></label>
         <label class="f inline" title="Сколько готовых статей (текст и обложка, ждут своего дня) держать про запас"><input type="number" id="ap-buffer" min="3" max="60" step="1" style="width:64px"> про запас</label>
@@ -360,7 +364,7 @@ body:not(.view-edit) .mbar { display: none !important; }
       </div>
       <p class="hint" id="q-buffer-status" style="margin:8px 0 0"></p>
       <ul class="qlist" id="q-list"></ul>
-      <p class="hint" id="q-hint" style="margin:8px 0 0">Сюда попадает каждая статья, которую вы отправили писать: текст и обложка готовятся одновременно на сервере (страницу можно закрыть), затем статья сама встаёт на ближайший свободный день по ритму, 10:00. Автопилот держит запас готовых статей: просел до ¼ от цели — дописывает пачкой (не быстрее нескольких в день), пока не наберёт полный запас снова.</p>
+      <p class="hint" id="q-hint" style="margin:8px 0 0">Сюда попадает каждая статья, которую вы отправили писать: текст и обложка готовятся одновременно на сервере (страницу можно закрыть), затем статья сама встаёт на ближайший свободный день по ритму, 10:00. Автопилот держит запас готовых статей: просел до ¼ от цели — по пятницам дописывает пачкой (не быстрее нескольких в день) на неделю вперёд, пока не наберёт полный запас снова, остальные дни молчит.</p>
     </section>
     <section class="card" id="list-card">
       <div class="row" style="margin-bottom:14px">
