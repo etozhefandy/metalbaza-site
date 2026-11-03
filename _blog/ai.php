@@ -1098,15 +1098,20 @@ function ideas_with_plan(?array $result, int $per_week = 2, ?DateTimeImmutable $
     $slots = slot_plan($per_week);
     $articles = load_all();
     $known = [];
+    $known_keys = [];
     $taken = [];
     foreach ($articles as $a) {
         foreach ($a['keywords'] as $k) $known[mb_strtolower(trim($k))] = true;
+        if (($a['topic_key'] ?? '') !== '') $known_keys[$a['topic_key']] = true;
         if ($dt = parse_dt($a['publish_at'])) $taken[$dt->format('Y-m-d\TH:i')] = true;
     }
     $cursor = ($start ?? now())->setTime(23, 59, 59);
     $ideas = [];
     foreach ($result['ideas'] ?? [] as $idea) {
-        $idea['used'] = isset($known[mb_strtolower(trim((string) ($idea['main_keyword'] ?? '')))]);
+        // ключевые слова не всегда дословно повторяются в готовой статье (ниже) — но topic_key статьи,
+        // сохранённый при публикации (queue_finish), сравнивается с темой идеи точно и не «истекает»,
+        // в отличие от защиты в queue_pick_topic(), которая помнит только последние QUEUE_KEEP записей
+        $idea['used'] = isset($known[mb_strtolower(trim((string) ($idea['main_keyword'] ?? '')))]) || isset($known_keys[topic_key($idea)]);
         $idea['suggested_date'] = '';
         if (!$idea['used'] && ($idea['status'] ?? 'new') === 'new' && ($next = slot_after($cursor, $slots, $taken))) {
             $taken[$next->format('Y-m-d\TH:i')] = true;

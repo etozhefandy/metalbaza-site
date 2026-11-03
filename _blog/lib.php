@@ -26,6 +26,7 @@ const FIELDS = [
     'slug' => '', 'title' => '', 'seo_title' => '', 'description' => '', 'lead' => '', 'summary' => '',
     'body_md' => '', 'category' => '', 'keywords' => [], 'cover_path' => '', 'author' => '', 'read_min' => null,
     'faq' => [], 'related' => [], 'status' => 'draft', 'publish_at' => '', 'created_at' => '', 'updated_at' => '', 'lang' => 'ru',
+    'topic_key' => '', // ключ идеи (ai.php topic_key()), с которой статья написана — постоянная защита от повторного выбора той же темы, см. ideas_with_plan()
 ];
 const LANGS = ['ru', 'kk'];   // статьи блога: русский (по умолчанию, старые статьи без поля — тоже он) и казахский
 
@@ -85,7 +86,7 @@ function normalize(array $a): array
     foreach (FIELDS as $k => $_) {
         if (array_key_exists($k, $a) && $a[$k] !== null) $out[$k] = $a[$k];
     }
-    foreach (['slug', 'title', 'seo_title', 'description', 'lead', 'summary', 'category', 'cover_path', 'author', 'status', 'publish_at'] as $k) {
+    foreach (['slug', 'title', 'seo_title', 'description', 'lead', 'summary', 'category', 'cover_path', 'author', 'status', 'publish_at', 'topic_key'] as $k) {
         $out[$k] = trim(is_scalar($out[$k]) ? (string) $out[$k] : '');
     }
     $out['slug'] = strtolower($out['slug']);
@@ -427,6 +428,15 @@ function post_date(array $a, string $field = 'publish_at'): string
     return $dt->format('Y-m-d');
 }
 
+/** "Дата изменения" для схемы/sitemap/фида: updated_at — это штамп последнего save_article(), который
+ *  может быть раньше publish_at (статью сохранили один раз при написании, а вышла она по расписанию
+ *  днями позже) — отсюда dateModified < datePublished в глазах Google/AI-поиска. Берём более позднюю
+ *  из двух, чтобы публично показанная дата изменения никогда не была раньше даты публикации. */
+function modified_date(array $a): string
+{
+    return max(post_date($a, 'updated_at'), post_date($a));
+}
+
 function human_date(string $iso): string
 {
     [$y, $m, $d] = array_map('intval', explode('-', $iso));
@@ -551,6 +561,11 @@ function render_article(array $a, array $posts, bool $noindex = false): string
     // «Читайте также»: выбранные вручную + свежие до трёх.
     $chosen = array_values(array_filter(array_map(fn($s) => $by_slug[$s] ?? null, $a['related'])));
     $rest = array_values(array_filter($by_slug, fn($p) => !in_array($p['slug'], $a['related'], true)));
+    // без ручного выбора статьи той же категории идут первыми (стабильная сортировка — порядок по
+    // свежести внутри каждой группы не теряется), а не просто три последние вышедшие без разбора темы
+    if ($a['category'] !== '') {
+        usort($rest, fn($x, $y) => ($y['category'] === $a['category']) <=> ($x['category'] === $a['category']));
+    }
     $related = array_merge($chosen, array_slice($rest, 0, max(0, 3 - count($chosen))));
 
     $toc_html = '';
@@ -603,7 +618,7 @@ function render_article(array $a, array $posts, bool $noindex = false): string
     $image = $a['cover_path'] ?: null;
     $posting = [
         '@type' => 'BlogPosting', 'headline' => $a['title'], 'description' => $a['description'],
-        'datePublished' => post_date($a), 'dateModified' => post_date($a, 'updated_at'), 'inLanguage' => $lang === 'kk' ? 'kk-KZ' : 'ru-KZ',
+        'datePublished' => post_date($a), 'dateModified' => modified_date($a), 'inLanguage' => $lang === 'kk' ? 'kk-KZ' : 'ru-KZ',
         'mainEntityOfPage' => $site . $path, 'image' => $site . ($image ?: '/assets/og.png'),
         'author' => $a['author'] !== '' ? ['@type' => 'Person', 'name' => $a['author']] : ['@id' => "$site/#org"],
         'publisher' => ['@id' => "$site/#org"],
@@ -674,11 +689,11 @@ function render_sitemap(string $base, array $posts): string
     $rows = [];
     // список статей ("/blog/" или "/kz/blog/") — по одной записи на каждый язык, который реально есть среди вышедших
     foreach (array_unique(array_column($posts, 'lang')) as $lang) {
-        $dates = array_map(fn($a) => post_date($a, 'updated_at'), array_filter($posts, fn($a) => $a['lang'] === $lang));
+        $dates = array_map('modified_date', array_filter($posts, fn($a) => $a['lang'] === $lang));
         $rows[] = '<url><loc>' . $site . blog_path($lang) . '</loc><lastmod>' . max($dates) . '</lastmod></url>';
     }
     foreach ($posts as $a) {
-        $rows[] = '<url><loc>' . $site . article_path($a) . '</loc><lastmod>' . post_date($a, 'updated_at') . '</lastmod></url>';
+        $rows[] = '<url><loc>' . $site . article_path($a) . '</loc><lastmod>' . modified_date($a) . '</lastmod></url>';
     }
     return str_replace('</urlset>', implode("\n", $rows) . "\n</urlset>", $base);
 }

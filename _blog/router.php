@@ -47,7 +47,11 @@ try {
             send_html(render_home((string) file_get_contents(SITE_DIR . '/index.html'), live_articles(null, 'ru')));
             break;
         case 'index':
-            send_html(render_blog_index(live_articles(null, $lang), $lang));
+            $posts = live_articles(null, $lang);
+            // блога на этом языке нет вообще (например казахских статей ещё не писали) — отдаём 404, а не
+            // пустую страницу-дубль с тем же title/description, что и у основного /blog/ (ru)
+            if ($lang !== 'ru' && !$posts) not_found();
+            send_html(render_blog_index($posts, $lang));
             break;
         case 'article':
             $a = get_article((string) ($_GET['slug'] ?? ''));

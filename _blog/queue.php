@@ -355,6 +355,7 @@ function queue_finish(array $item): void
                 'lead' => $a['lead'] ?? '', 'summary' => $a['summary'] ?? '', 'body_md' => $a['body_md'] ?? '', 'category' => $a['category'] ?? '',
                 'keywords' => $a['keywords'] ?? $item['keywords'], 'faq' => $a['faq'] ?? [], 'related' => $a['related'] ?? [],
                 'lang' => in_array($item['lang'] ?? '', LANGS, true) ? $item['lang'] : 'ru',
+                'topic_key' => (string) ($item['topic_key'] ?? ''),
                 'cover_path' => $item['cover_path'], 'author' => defined('NICHE_AUTHOR') ? NICHE_AUTHOR : '',
                 'status' => 'scheduled', 'publish_at' => next_free_slot(queue_settings()['per_week']),
             ]);
