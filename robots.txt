@@ -1,77 +1,90 @@
 User-agent: *
 Allow: /
+Allow: /api/send.php
 Disallow: /api/
 Disallow: /admin/
 Disallow: /_blog/
 
 User-agent: OAI-SearchBot
 Allow: /
+Allow: /api/send.php
 Disallow: /api/
 Disallow: /admin/
 Disallow: /_blog/
 
 User-agent: ChatGPT-User
 Allow: /
+Allow: /api/send.php
 Disallow: /api/
 Disallow: /admin/
 Disallow: /_blog/
 
 User-agent: GPTBot
 Allow: /
+Allow: /api/send.php
 Disallow: /api/
 Disallow: /admin/
 Disallow: /_blog/
 
 User-agent: PerplexityBot
 Allow: /
+Allow: /api/send.php
 Disallow: /api/
 Disallow: /admin/
 Disallow: /_blog/
 
 User-agent: Perplexity-User
 Allow: /
+Allow: /api/send.php
 Disallow: /api/
 Disallow: /admin/
 Disallow: /_blog/
 
 User-agent: ClaudeBot
 Allow: /
+Allow: /api/send.php
 Disallow: /api/
 Disallow: /admin/
 Disallow: /_blog/
 
 User-agent: Claude-SearchBot
 Allow: /
+Allow: /api/send.php
 Disallow: /api/
 Disallow: /admin/
 Disallow: /_blog/
 
 User-agent: Claude-User
 Allow: /
+Allow: /api/send.php
 Disallow: /api/
 Disallow: /admin/
 Disallow: /_blog/
 
 User-agent: Google-Extended
 Allow: /
+Allow: /api/send.php
 Disallow: /api/
 Disallow: /admin/
 Disallow: /_blog/
 
 User-agent: Applebot-Extended
 Allow: /
+Allow: /api/send.php
 Disallow: /api/
 Disallow: /admin/
 Disallow: /_blog/
 
 User-agent: YandexAdditional
 Allow: /
+Allow: /api/send.php
 Disallow: /api/
 Disallow: /admin/
 Disallow: /_blog/
 
 User-agent: Bingbot
 Allow: /
+Allow: /api/send.php
 Disallow: /api/
 Disallow: /admin/
 Disallow: /_blog/
