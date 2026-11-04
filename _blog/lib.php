@@ -675,7 +675,7 @@ function render_home(string $html, array $posts): string
   <div class="wrap">
     <div class="sec-head rv">' . eyebrow($m[1], ui('nav')) . '<h2>' . e(ui('home_title')) . '</h2><p>' . e(ui('lead')) . '</p></div>
     <div class="post-grid">' . post_cards(array_slice($posts, 0, 3)) . '</div>
-    <p class="rv" style="margin:32px 0 0"><a class="tlink" href="' . blog_path() . '">' . e(ui('all')) . ' ' . parts()['icon_arrow_sm'] . '</a></p>
+    <p class="rv sec-more"><a class="tlink" href="' . blog_path() . '">' . e(ui('all')) . ' ' . parts()['icon_arrow_sm'] . '</a></p>
   </div>
 </section>';
     }, $html, 1);
