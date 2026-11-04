@@ -455,14 +455,17 @@ function eyebrow(string $num, string $text): string
     return '<p class="eyebrow"><span>' . $num . '</span>' . e($text) . '</p>';
 }
 
-function post_cards(array $posts): string
+/** $heading — уровень заголовка карточки: h2 на странице списка статей (там это единственный уровень
+ *  под h1), h3 там, где карточки идут внутри раздела со своим h2 («Читайте также», блок на главной) —
+ *  иначе получаются два h2 подряд на одном уровне, и структура страницы для скринридеров и ИИ путается. */
+function post_cards(array $posts, string $heading = 'h2'): string
 {
     $out = '';
     foreach ($posts as $a) {
         $out .= '<a class="post-card rv" href="' . article_path($a) . '">'
             . ($a['cover_path'] !== '' ? '<img class="post-img" src="' . e($a['cover_path']) . '" alt="" loading="lazy">' : '')
             . '<div class="post-body"><span class="post-meta">' . post_meta($a) . '</span>'
-            . '<h2>' . e($a['title']) . '</h2><p>' . e($a['description'] ?: $a['lead']) . '</p>'
+            . "<$heading>" . e($a['title']) . "</$heading><p>" . e($a['description'] ?: $a['lead']) . '</p>'
             . '<span class="tlink">' . e(ui('more')) . ' ' . parts()['icon_arrow_sm'] . '</span></div></a>';
     }
     return $out;
@@ -585,7 +588,7 @@ function render_article(array $a, array $posts, bool $noindex = false): string
 <section class="sec sec-soft">
   <div class="wrap">
     <div class="sec-head rv">' . eyebrow('→', ui('related', $lang)) . '<h2>' . e(ui('related', $lang)) . '</h2></div>
-    <div class="post-grid">' . post_cards($related) . '</div>
+    <div class="post-grid">' . post_cards($related, 'h3') . '</div>
     <p class="post-all"><a class="tlink" href="' . $bp . '">' . e(ui('all', $lang)) . ' ' . $arrow . '</a></p>
   </div>
 </section>';
@@ -674,7 +677,7 @@ function render_home(string $html, array $posts): string
 <section class="sec" id="blog">
   <div class="wrap">
     <div class="sec-head rv">' . eyebrow($m[1], ui('nav')) . '<h2>' . e(ui('home_title')) . '</h2><p>' . e(ui('lead')) . '</p></div>
-    <div class="post-grid">' . post_cards(array_slice($posts, 0, 3)) . '</div>
+    <div class="post-grid">' . post_cards(array_slice($posts, 0, 3), 'h3') . '</div>
     <p class="rv sec-more"><a class="tlink" href="' . blog_path() . '">' . e(ui('all')) . ' ' . parts()['icon_arrow_sm'] . '</a></p>
   </div>
 </section>';
