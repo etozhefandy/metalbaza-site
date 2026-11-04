@@ -1,142 +1,142 @@
 {
  "/": {
   "date": "2026-11-04",
-  "hash": "ff5fd4f3fe844eee661c98b3dea017627798ac8f2c742577c7664746b4c83472"
+  "hash": "a8851d1a1e2bcc00906ab6cc199ad8df0475f3c52e0852f27baa85355ef20a00"
  },
  "/aktobe/": {
   "date": "2026-11-04",
-  "hash": "f8083ef992ea2cb2ff4bd1dfcb0f03678f7a27326b2eb5be195268b499f41141"
+  "hash": "f58e022082a6adf701f61b0ffa52b4cbf805a5d84d91867a845f66571c9469f9"
  },
  "/almaty/": {
   "date": "2026-11-04",
-  "hash": "563f1a270e86b499c0efe96c62babda833bb4cb78d2cf8ab36c373eac97e472c"
+  "hash": "f5f540cc571b8ac961716833ca725f0fbe3f1267677c5e93c6b6b6ad70f6e114"
  },
  "/armatura/": {
   "date": "2026-11-04",
-  "hash": "e7fbf6f29def19af02cec07d892935b614e84c7ee41b8d58bdfbabea0960c505"
+  "hash": "e86279c991bc1b1723aff4302db088b4c77ae79ccb4e6764f44aceb0c7c3d2c7"
  },
  "/astana/": {
   "date": "2026-11-04",
-  "hash": "cc788b070955e3d142cdfa3dadeb30b1ed66b9f0ac59de3ed73d3f456acb7768"
+  "hash": "7978699b770a8f1dfbb98d6865e81c8dc40a10bdaf1d5b42410f77b9bceecc1d"
  },
  "/balka/": {
   "date": "2026-11-04",
-  "hash": "3b1c6f9e6e9b1a3187b768a1aaa217393195f2b174e741a346f415abf16ef906"
+  "hash": "930ff82c608a096983c8d4381e73b22216b6d6d6ca984a2a164b0ca56466585b"
  },
  "/kak-rabotaet/": {
   "date": "2026-11-04",
-  "hash": "897a07c1352a03c8f52662f8e15a5bc3973952ca5d86a55e4752b72c0a47cc85"
+  "hash": "0057dfe78fec45987e731273cfdc21aefeb8e24f43706a676a77a84e11dc64d8"
  },
  "/karaganda/": {
   "date": "2026-11-04",
-  "hash": "4e3d078c503cce1078b485025a03fea9c607429509ed612c07d6a717bdcfa579"
+  "hash": "36e9d5e582b7c3944e31820a8caed3fea580fa60ff0ddb5b4624879fdccf2eab"
  },
  "/katanka/": {
   "date": "2026-11-04",
-  "hash": "27b272edfdabe8e1b56a1392c8454081ec6b031cf5494b7cbaf10c54a721494a"
+  "hash": "132bde0043a5af207e9167d48c56f8db310d6ad3dfe898d208f8e7454bc2b377"
  },
  "/kontakty/": {
   "date": "2026-11-04",
-  "hash": "c83580f0c220c52aea955768992486f0f8315a1a26ad243e40e5a7e76213d325"
+  "hash": "d9639f5927e892d258f9c2654d324c6031359f75377039f38af9282bb3230eff"
  },
  "/krovlya-i-zabor/": {
   "date": "2026-11-04",
-  "hash": "094d8e8b4adb4d1a4fca52d1656002a98f00de30e9b25a48d20c2210610e5744"
+  "hash": "d395237115c6aeaef0784ec28b52a8ec9e972f038a532c4b98e1a4d109ede135"
  },
  "/krug/": {
   "date": "2026-11-04",
-  "hash": "f52df9f922c03403d12db1ba773565bc94d2121995e04e3f4d16777ce3dec4ad"
+  "hash": "3fc37d7be76ad6a49eaf7b3616047b1b438533e95857e1e80ae160569b124136"
  },
  "/kvadrat/": {
   "date": "2026-11-04",
-  "hash": "b3e7d86a7ecd8ac981afcfb7856873852f507e7ec50fd0f09b2b6a4735e49f7f"
+  "hash": "a0ec8d487068f7758aa98d8466d7e9f1eb45eda0aab1a561aa304cddb1d7bcec"
  },
  "/list-goryachekatanyj/": {
   "date": "2026-11-04",
-  "hash": "f1d37b5acbf629fb4f341bd160c23bb17e7d3237f1f7535cad8eda67e0d81e52"
+  "hash": "3c661c9cd29375181408af04605cd6db6ee19c9cc6de88de290a37b38df241f4"
  },
  "/list-holodnokatanyj/": {
   "date": "2026-11-04",
-  "hash": "e2cd99abca5de20e912c23e26951e3b80443e3d2a0d11d9148d1089882dbf16a"
+  "hash": "1c3e1950d19d3c70e063fc1eeb4b9c60b41d34ad9f986489b27e00f2e9ed3dfb"
  },
  "/list-ocinkovannyj/": {
   "date": "2026-11-04",
-  "hash": "600b22e464c56ddb286b5c2ba6976729846a72a42dbd937f02e1e5b1e3b695c4"
+  "hash": "9438c2121aaedc057bd7473ef53d238bde687b944e0a272d6792374b2ce1c975"
  },
  "/list-pvl/": {
   "date": "2026-11-04",
-  "hash": "73655255588345e4e7c4c94eeb780e2ce700c47322628adb5a2fa4edaef0bca9"
+  "hash": "69ce0cf7261b62cc90d9fe8ecc9ba88774040b3795b8ec4285aa413b27e4e62a"
  },
  "/list-riflenyj/": {
   "date": "2026-11-04",
-  "hash": "374c8e272c3b4e2a76ebccad8927f0ba64a085057c20deef256415387ca3720e"
+  "hash": "9c4747f23ad83886566024d8855bc4eb80f70cfddd0f676130ee37ce6ac3f8f6"
  },
  "/listovoj-prokat/": {
   "date": "2026-11-04",
-  "hash": "c410622dc6850e21ec5084e050b4161e37ca8afc27a85d5b81429c50ab8e6edb"
+  "hash": "da82abf0e4def36e3c7f32e439e728270065aef1d36df60a458e32ac0f18d902"
  },
  "/metallocherepica/": {
   "date": "2026-11-04",
-  "hash": "cbd89a219165e7d2ba2f9530d991e54d4609a8632700084fe12d0fdcc7ae2524"
+  "hash": "cee486369bf809aa34cfb0d70831b91c98fae1fa38bda6f40af0f40f0942f51f"
  },
  "/politika-konfidencialnosti/": {
   "date": "2026-11-04",
-  "hash": "455b73636dd00388227a6314bcb98a6253eac988fb5359232af1a046ca2122c1"
+  "hash": "05d0aa14cb995e5e586319db69b6050f4553ebddcf3408fb50ad5f27d2b537eb"
  },
  "/polosa/": {
   "date": "2026-11-04",
-  "hash": "5f541f0224dba758bd5b0f5d3b2a6d417b871cd5a7344ed2899a153198c4cfac"
+  "hash": "658dddbacbfba098a2e583bfdecb2781fa14bec4b461f7458bc94d452711fbdf"
  },
  "/postavshchikam/": {
   "date": "2026-11-04",
-  "hash": "e56c341b5bc7c6c5bc7d5a98576081fa381e5553d95d3c8a20fd2e68a4b79c02"
+  "hash": "955e9220953b700f1a2df3782954bf74440e3531fccd401c9de9f606e97b3391"
  },
  "/profnastil/": {
   "date": "2026-11-04",
-  "hash": "19b4afabc2c2693cd2adc7afd296162acd270ad9323df25ba64a9653717dfed5"
+  "hash": "d53a64329ba21b7d612f020e062af1b0eeb9a1e9c55599823e0d41dc380dbaa6"
  },
  "/provoloka-vyazalnaya/": {
   "date": "2026-11-04",
-  "hash": "cc6f06081b2a1bb299348c6d9c9eef1f2da565040d240e56dcf0506c881ea187"
+  "hash": "38f11f2f580211f4e1e06e0ddd761ee1d5790aa951d26b72ac7cffc78d2250e2"
  },
  "/setka-i-provoloka/": {
   "date": "2026-11-04",
-  "hash": "4c3932ca5126e357c005fde55fcb6e1c37518c5b22fc74516495cd9a4b9ca2a2"
+  "hash": "29be4a07365b2c5422aa3401fe96a820d6a3d0f35d0a989deb5b5c255f7e0e34"
  },
  "/setka-kladochnaya/": {
   "date": "2026-11-04",
-  "hash": "c775a492d0484aa89334cb99d316e47b0f07444f65c899a2fb26096aa9a6b2ef"
+  "hash": "d61074b71fea6ed02b0fd4cd3f780500c2f604ea778519c48b64512aeebc5f1c"
  },
  "/shveller/": {
   "date": "2026-11-04",
-  "hash": "c85333c6dd2581f4108bc46333a4528f6189c5735f8625a070741a7dbaa744d8"
+  "hash": "a385495460e553f62c2919640e47fffc254ac73a29c2c9cb7eaeda515faefea9"
  },
  "/shymkent/": {
   "date": "2026-11-04",
-  "hash": "2aeefbc7fcc13636ce26d1bdddf0936dde5b89e12924602b6380090eb602135e"
+  "hash": "3d96f49ca6a8b9829bdce5d646c2850508639fe7fe8993cd327eb84a32360557"
  },
  "/sortovoj-prokat/": {
   "date": "2026-11-04",
-  "hash": "e51d10706188146c696c4ddebc362749a511de6474a002ed98f1d1f4428b7dbf"
+  "hash": "38356dea81f50537aca0de4b456b1799cdc5dedef807c795f5fb3dcb82f48e24"
  },
  "/truba-elektrosvarnaya/": {
   "date": "2026-11-04",
-  "hash": "cef59e91af6f251ea7b6f7b2fa954f6dc56203b00d884fcfec6e88340ce45070"
+  "hash": "16a35ae931773d8bb67f75d3e99ec5e932e9fde52a6b2b4c89bc33b97ed689a1"
  },
  "/truba-profilnaya/": {
   "date": "2026-11-04",
-  "hash": "143d23bdce12453a0c74a344356e9e8557e6676151ebb246ffb973becc28057f"
+  "hash": "2eba01702d7b4c90c88ec376d9b0651894544d814bc44e7f28cddf1bcde22de0"
  },
  "/truba-vgp/": {
   "date": "2026-11-04",
-  "hash": "c15e5760af829de06f87ad4c87f1c639b8efffc0fbe22c4ebd4afe8dc644b278"
+  "hash": "5557824a2773a4457c036de1b4575bb8dcb99bbdf78607888a4a080aa66e84df"
  },
  "/truby/": {
   "date": "2026-11-04",
-  "hash": "7faf53c9109f49d87a3f866dea5a681f6f7f38b3678068392bc5cff5e7468578"
+  "hash": "2575d9bbd45b42d018fe55f28c33825c771ea35f63112ccd775d362f58c79da3"
  },
  "/ugolok/": {
   "date": "2026-11-04",
-  "hash": "6de8cd8785858aca3ede420c37a4de96b9672d14f98bd12ae77c2628ddc108f3"
+  "hash": "c9195e17e4fab5e2d234b53d864c2d0e88965e13461f236482c78e942f43f0b4"
  }
 }

@@ -203,6 +203,11 @@ section[id] { scroll-margin-top: 72px; }
   background: var(--bg); border: 1px solid var(--ink);
 }
 .flow-n { display: block; font-family: var(--font-mono); font-size: 13px; color: var(--muted); margin-bottom: 8px; }
+/* --i/--n классом, не inline style="" (CSP script/style-src без unsafe-inline); число задаёт build.py (flow()) */
+.flow-i-0 { --i: 0 } .flow-i-1 { --i: 1 } .flow-i-2 { --i: 2 } .flow-i-3 { --i: 3 } .flow-i-4 { --i: 4 } .flow-i-5 { --i: 5 } .flow-i-6 { --i: 6 } .flow-i-7 { --i: 7 }
+.flow-i-8 { --i: 8 } .flow-i-9 { --i: 9 } .flow-i-10 { --i: 10 } .flow-i-11 { --i: 11 } .flow-i-12 { --i: 12 } .flow-i-13 { --i: 13 } .flow-i-14 { --i: 14 } .flow-i-15 { --i: 15 }
+.flow-n-1 { --n: 1 } .flow-n-2 { --n: 2 } .flow-n-3 { --n: 3 } .flow-n-4 { --n: 4 } .flow-n-5 { --n: 5 } .flow-n-6 { --n: 6 } .flow-n-7 { --n: 7 } .flow-n-8 { --n: 8 }
+.flow-n-9 { --n: 9 } .flow-n-10 { --n: 10 } .flow-n-11 { --n: 11 } .flow-n-12 { --n: 12 }
 .flow h3 { font-size: 22px; margin-bottom: 8px; }
 .flow li p { color: var(--ink-2); font-size: 15px; margin: 0; max-width: 32ch; }
 .sec-soft .flow li::after { background: var(--soft); }
