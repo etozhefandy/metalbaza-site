@@ -1,4 +1,11 @@
 (function () {
+  // Шрифты грузятся как media="print" (не блокируют рендер), здесь включаем media="all" — раньше это было
+  // inline onload="" на самом <link>, но CSP script-src-attr без unsafe-inline/unsafe-hashes такое блокирует.
+  document.querySelectorAll(".js-async-css").forEach(function (l) {
+    if (l.sheet) { l.media = "all"; return; }   // уже загружен (из кэша) — JS мог стартовать позже загрузки
+    l.addEventListener("load", function () { l.media = "all"; });
+  });
+
   // Мобильное меню
   var burger = document.querySelector(".burger");
   var nav = document.getElementById("nav");
