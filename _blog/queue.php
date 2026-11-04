@@ -347,6 +347,11 @@ function queue_finish(array $item): void
     $error = '';
     try {
         $saved = queue_locked(function () use ($a, $item) {   // под замком: две статьи не займут один день
+            $title = (string) ($a['title'] ?? $item['topic']);
+            $keyword = (string) (($a['keywords'] ?? $item['keywords'] ?? [])[0] ?? '');
+            if (($dup = article_duplicate_check($title, $keyword)) !== null) {
+                throw new RuntimeException('Похоже на уже опубликованную статью «' . $dup . '» — не публикуем, поправьте тему и попробуйте снова.');
+            }
             $slug = preg_match(SLUG_RE, (string) ($a['slug'] ?? '')) ? (string) $a['slug'] : slugify((string) ($a['title'] ?? $item['topic']));
             $base = $slug;
             for ($n = 2; get_article($slug); $n++) $slug = "$base-$n";   // адрес занят — не затираем другую статью

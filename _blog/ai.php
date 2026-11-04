@@ -1069,6 +1069,46 @@ function topics_dedupe(?callable $post = null): int
     return count($dup);
 }
 
+/**
+ * Страховка перед публикацией: уже написанная статья отвечает на тот же вопрос, что опубликованная?
+ * Тот же приём, что в topics_dedupe(), но для одной готовой статьи — и, в отличие от topics_dedupe()
+ * (который чистит только список «Темы статей»), стоит в queue_finish(), через который проходит
+ * публикация ЛЮБОГО источника темы: «Своя тема», «Из поста/ссылки», «Придумай сам» и темы, уже прошедшие
+ * topics_dedupe(). Так пара дублей не проскочит только из-за того, что формулировки отличались
+ * («таргет» vs «таргетированная реклама») и exact-match проверка topic_key() их не считала за одно и то же.
+ * Ошибка ИИ не блокирует публикацию — тогда просто не проверяем. → заголовок дубля или null.
+ * $post — как везде, подмена в тестах; без неё и в офлайн-тестах (ALFIMOV_OFFLINE) в сеть не ходим —
+ * иначе queue_tick() в test_queue.php на каждой законченной статье реально стучался бы в Anthropic API.
+ */
+function article_duplicate_check(string $title, string $main_keyword, ?callable $post = null): ?string
+{
+    $title = trim($title);
+    if ($title === '') return null;
+    if ($post === null && getenv('ALFIMOV_OFFLINE')) return null;
+    $arts = array_map(fn($a) => '- ' . $a['title'] . ($a['keywords'] ? ' — ' . $a['keywords'][0] : ''), load_all());
+    if (!$arts) return null;
+    try {
+        $data = claude_json([
+            'max_tokens' => 500,
+            'output_config' => ['effort' => 'low', 'format' => ['type' => 'json_schema', 'schema' => [
+                'type' => 'object',
+                'properties' => ['duplicate_of' => ['type' => ['string', 'null'], 'description' => 'точный заголовок статьи блога, которую повторяет новая, или null']],
+                'required' => ['duplicate_of'], 'additionalProperties' => false]]],
+            'messages' => [['role' => 'user', 'content' =>
+                "Ты редактор блога. Новая статья отвечает на тот же вопрос читателя, что уже опубликованная в блоге?\n\n"
+                . "Новая статья: «{$title}»" . ($main_keyword !== '' ? " — главный запрос «{$main_keyword}»" : '') . "\n\n"
+                . "Уже опубликованные статьи блога (заголовок — главный запрос):\n" . implode("\n", $arts)
+                . "\n\nСчитай дублем, если отвечает на тот же вопрос, даже другими словами и с другим городом. " . P('dup_rule')
+                . "Если дубль — верни точный заголовок той статьи из списка выше. Если нет — null."]],
+        ], $post);
+    } catch (AiError $ex) {
+        error_log('article dup check: ' . $ex->getMessage());
+        return null;
+    }
+    $of = trim((string) ($data['duplicate_of'] ?? ''));
+    return $of !== '' ? mb_substr($of, 0, 200) : null;
+}
+
 /** Список тем для экрана: написанные помечены, новым — рекомендуемые даты по ритму. */
 function topics_view(int $per_week = 2): array
 {
