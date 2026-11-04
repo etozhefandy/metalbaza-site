@@ -516,8 +516,10 @@ def build_home():
         desc="Арматура, профнастил, трубы, лист и балка: одна заявка — цены, наличие и доставка от нескольких металлобаз вашего города. Бесплатно для покупателя.",
         body=body,
         schema=[
-            {"@type": "WebSite", "@id": f"{SITE_URL}/#site", "url": f"{SITE_URL}/", "name": cfg.BRAND, "inLanguage": "ru"},
-            faq_schema(HOME_FAQ),
+            {"@type": "WebSite", "@id": f"{SITE_URL}/#site", "url": f"{SITE_URL}/", "name": cfg.BRAND,
+             "inLanguage": "ru", "publisher": {"@id": f"{SITE_URL}/#org"}},
+            # FAQPage-разметку не дублируем — те же вопросы уже размечены на /kak-rabotaet/, видимый
+            # блок вопросов на главной остаётся (faq_block ниже), просто без повторной JSON-LD схемы.
         ],
     )
 

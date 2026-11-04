@@ -373,6 +373,7 @@ section[id] { scroll-margin-top: 72px; }
 
 /* blog: список и статья */
 .sec-tight { padding-top: 24px; }
+.sec-more { margin: 32px 0 0; }   /* «Все статьи» под карточками на главной — lib.php:render_home(), не inline style (CSP) */
 .post-grid { display: grid; gap: 24px; }
 @media (min-width: 720px) { .post-grid { grid-template-columns: repeat(2, 1fr); } }
 @media (min-width: 1020px) { .post-grid { grid-template-columns: repeat(3, 1fr); } }
@@ -381,7 +382,7 @@ section[id] { scroll-margin-top: 72px; }
 .post-img { width: 100%; aspect-ratio: 3 / 2; object-fit: cover; background: var(--soft); transition: transform .4s var(--ease); }
 .post-card:hover .post-img { transform: scale(1.02); }
 .post-body { display: flex; flex-direction: column; gap: 14px; padding: 24px 28px 28px; flex: 1; }
-.post-card h2 { font-size: 22px; letter-spacing: -0.015em; line-height: 1.2; }
+.post-card h2, .post-card h3 { font-size: 22px; letter-spacing: -0.015em; line-height: 1.2; }
 .post-card:hover h2 { color: var(--blue); }
 .post-card p { margin: 0; color: var(--ink-2); font-size: 16px; flex: 1; }
 .post-card .tlink { align-self: flex-start; }
