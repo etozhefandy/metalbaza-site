@@ -1,6 +1,16 @@
 <?php
 // Админка блога: /admin/ — вход, первая настройка, само приложение (_blog/admin.tpl).
 declare(strict_types=1);
+
+// Прямой вход на сайте закрыт — единая точка входа теперь пульт admin.alfimov.kz.
+// HUB_ADMIN_BASE определён только когда этот файл подключает сам пульт (hub/pult.php
+// pult_site_admin()) — тогда не редиректим, чтобы не зациклить пульт на самого себя.
+require dirname(__DIR__) . '/_blog/site.php';
+if (!defined('HUB_ADMIN_BASE')) {
+    header('Location: https://admin.alfimov.kz/s/' . SITE_HOST . '/admin/', true, 301);
+    exit;
+}
+
 require dirname(__DIR__) . '/_blog/auth.php';
 
 header('X-Robots-Tag: noindex, nofollow');
