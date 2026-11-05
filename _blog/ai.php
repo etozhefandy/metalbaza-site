@@ -104,20 +104,28 @@ function claude(array $body, ?callable $post = null): array
     $key = trim((string) (settings()['anthropic_key'] ?? ''));
     if ($post === null && $key === '') throw new AiError('Нет ключа Claude — вставьте его в «Настройках» админки');
     $body = ['model' => claude_model(), 'stream' => true] + $body;
-    if ($post) {
-        [$code, $raw] = $post($body);
-    } else {
-        @set_time_limit(600);
-        $ch = curl_init('https://api.anthropic.com/v1/messages');
-        curl_setopt_array($ch, [
-            CURLOPT_POST => true, CURLOPT_RETURNTRANSFER => true, CURLOPT_TIMEOUT => 540, CURLOPT_CONNECTTIMEOUT => 20,
-            CURLOPT_HTTPHEADER => ['x-api-key: ' . $key, 'anthropic-version: 2023-06-01', 'content-type: application/json'],
-            CURLOPT_POSTFIELDS => json_encode($body, JSON_UNESCAPED_UNICODE),
-        ]);
-        $raw = curl_exec($ch);
-        $code = (int) curl_getinfo($ch, CURLINFO_HTTP_CODE);
-        $err = curl_error($ch);
-        if ($raw === false) throw new AiError('Нет связи с Claude API: ' . $err);
+    // 529 — Claude временно перегружен и отвечает сразу, без стрима, так что повтор почти ничего не стоит
+    // по времени — до 2 коротких повторов перед тем, как сдаться и показать ошибку.
+    // В тестах ($post задан) не повторяем — там фиксированное число вызовов $post.
+    $attempts = $post ? 1 : 3;
+    for ($try = 1; $try <= $attempts; $try++) {
+        if ($post) {
+            [$code, $raw] = $post($body);
+        } else {
+            @set_time_limit(600);
+            $ch = curl_init('https://api.anthropic.com/v1/messages');
+            curl_setopt_array($ch, [
+                CURLOPT_POST => true, CURLOPT_RETURNTRANSFER => true, CURLOPT_TIMEOUT => 540, CURLOPT_CONNECTTIMEOUT => 20,
+                CURLOPT_HTTPHEADER => ['x-api-key: ' . $key, 'anthropic-version: 2023-06-01', 'content-type: application/json'],
+                CURLOPT_POSTFIELDS => json_encode($body, JSON_UNESCAPED_UNICODE),
+            ]);
+            $raw = curl_exec($ch);
+            $code = (int) curl_getinfo($ch, CURLINFO_HTTP_CODE);
+            $err = curl_error($ch);
+            if ($raw === false) throw new AiError('Нет связи с Claude API: ' . $err);
+        }
+        if ($code === 529 && $try < $attempts) { sleep($try * 5); continue; }
+        break;
     }
     if ($code !== 200) {
         $msg = json_decode((string) $raw, true)['error']['message'] ?? '';
