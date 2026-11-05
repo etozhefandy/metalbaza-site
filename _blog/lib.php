@@ -463,7 +463,7 @@ function post_cards(array $posts, string $heading = 'h2'): string
     $out = '';
     foreach ($posts as $a) {
         $out .= '<a class="post-card rv" href="' . article_path($a) . '">'
-            . ($a['cover_path'] !== '' ? '<img class="post-img" src="' . e($a['cover_path']) . '" alt="" loading="lazy">' : '')
+            . ($a['cover_path'] !== '' ? '<img class="post-img" src="' . e($a['cover_path']) . '" alt="' . e($a['title']) . '" loading="lazy">' : '')
             . '<div class="post-body"><span class="post-meta">' . post_meta($a) . '</span>'
             . "<$heading>" . e($a['title']) . "</$heading><p>" . e($a['description'] ?: $a['lead']) . '</p>'
             . '<span class="tlink">' . e(ui('more')) . ' ' . parts()['icon_arrow_sm'] . '</span></div></a>';
