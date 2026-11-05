@@ -646,7 +646,7 @@ async function load(selectSlug) {
   }
   $("cats").innerHTML = [...new Set(articles.map(a => a.category).filter(Boolean))].map(c => `<option value="${esc(c)}">`).join("");
   renderList();
-  if (selectSlug) open(articles.find(a => a.slug === selectSlug) || null);
+  if (selectSlug) openArticle(articles.find(a => a.slug === selectSlug) || null);
   else if (selectSlug === null) showHome();
 }
 function renderList() {
@@ -798,7 +798,7 @@ function showHome(view) {
 function showEditor() { document.body.classList.remove("view-settings"); document.body.classList.add("view-edit"); window.scrollTo(0, 0); }
 $("list").onclick = e => {
   const li = e.target.closest("li[data-slug]"); if (!li) return;
-  open(articles.find(a => a.slug === li.dataset.slug));
+  openArticle(articles.find(a => a.slug === li.dataset.slug));
 };
 $("filters").onclick = e => {
   const b = e.target.closest("button"); if (!b) return;
@@ -806,7 +806,7 @@ $("filters").onclick = e => {
 };
 
 // ---------- редактор
-function open(a) {
+function openArticle(a) {
   current = a;
   const v = a || {status: "draft"};
   FIELDS.forEach(f => { $("f-" + f).value = v[f] ?? ""; });
@@ -925,7 +925,7 @@ $("f-status").addEventListener("change", async () => {
 });
 $("b-slug").onclick = () => { $("f-slug").value = slugify($("f-title").value); dirty = true; refresh(); };
 $("b-faq").onclick = () => { addFaq(); dirty = true; };
-$("b-new").onclick = () => { if (dirty && !confirm("Есть несохранённые изменения. Начать новую статью?")) return; delete $("f-slug").dataset.touched; open(null); };
+$("b-new").onclick = () => { if (dirty && !confirm("Есть несохранённые изменения. Начать новую статью?")) return; delete $("f-slug").dataset.touched; openArticle(null); };
 window.addEventListener("beforeunload", e => { if (dirty) { e.preventDefault(); e.returnValue = ""; } });
 
 // ---------- действия
@@ -1385,7 +1385,7 @@ function renderSeo() {
 }
 $("seo-body").onclick = e => {
   const a = e.target.closest("[data-open]"); if (!a) return;
-  e.preventDefault(); open(articles.find(x => x.slug === a.dataset.open) || null);
+  e.preventDefault(); openArticle(articles.find(x => x.slug === a.dataset.open) || null);
 };
 $("seo-run").onclick = async () => {
   try { seo = await api(BASE + "/api/seo/run", {method: "POST"}); renderSeo(); toast("Проверка запущена. Займёт 5–15 минут; отчёт придёт в Telegram и появится здесь."); }
