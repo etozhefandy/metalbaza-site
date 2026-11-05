@@ -142,7 +142,11 @@ ol.steps { margin: 8px 0; padding-left: 20px; display: grid; gap: 6px; font-size
 .qlist li { display: flex; gap: 12px; align-items: center; padding: 8px 12px; border: 1px solid var(--line); border-radius: var(--r); font-size: 14px; }
 .qlist li b { flex: 1; font-weight: 500; }
 .qlist .st { font-family: var(--mono); font-size: 12px; color: var(--muted); white-space: nowrap; }
-.qlist li.done .st { color: var(--ok); } .qlist li.error .st { color: var(--bad); }
+.qlist li.done .st { color: var(--ok); }
+/* у ошибки текст длинный (причина отказа) — короткий статус (даты и т.п.) не переносится по design, но
+   у длинной ошибки nowrap выше раздвигал всю страницу вширь; переносим и уводим на свою строку */
+.qlist li.error { flex-wrap: wrap; }
+.qlist li.error .st { color: var(--bad); white-space: normal; overflow-wrap: break-word; flex-basis: 100%; }
 .idea .pick { margin: 4px 0 0; width: 18px; height: 18px; flex: none; }
 #t-bulk { display: flex; flex-wrap: wrap; gap: 6px 12px; align-items: center; margin: 0 0 10px; }
 .idea .acts { display: flex; flex-direction: column; gap: 6px; flex: none; }
@@ -710,7 +714,8 @@ function renderQueue(d) {
   $("q-list").innerHTML = items.map(it => `<li class="${it.stage}"><b>${esc(it.title || it.topic || (it.origin === "auto" ? "Автопилот подбирает тему" : "Статья по источнику"))}</b>
     <span class="st">${esc(qStatus(it))}</span>${it.lang === "kk" ? `<span class="hint">KZ</span>` : ""}${it.model ? `<span class="hint">${it.model.includes("sonnet") ? "Sonnet" : "Opus"}</span>` : ""}${it.origin !== "manual" ? `<span class="hint">${it.origin === "auto" ? "🤖" : "☑︎"}</span>` : ""}
     ${it.stage === "done" ? `<button class="btn" data-qopen="${esc(it.slug)}">Открыть</button>` : ""}
-    ${it.stage === "queued" ? `<button class="btn" data-qcancel="${it.id}">Отменить</button>` : ""}</li>`).join("");
+    ${it.stage === "queued" ? `<button class="btn" data-qcancel="${it.id}">Отменить</button>` : ""}
+    ${it.stage === "error" ? `<button class="btn" data-qcancel="${it.id}">Убрать</button>` : ""}</li>`).join("");
   $("q-list").classList.toggle("hidden", !items.length);
   if (!d.ready) $("q-hint").textContent = "Чтобы писать статьи, вставьте ключи Claude и OpenAI в «Настройках».";
   // только что готовые — в список статей и уведомление

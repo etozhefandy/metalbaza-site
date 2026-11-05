@@ -163,7 +163,8 @@ function queue_cancel(string $id): bool
     return queue_locked(function () use ($id) {
         $s = queue_state();
         foreach ($s['items'] ?? [] as $i => $it) {
-            if ($it['id'] !== $id || in_array($it['stage'], ['done', 'error', 'cancelled'], true)) continue;
+            // статью с ошибкой тоже можно убрать из очереди — в UI это та же кнопка, см. admin.tpl (data-qcancel)
+            if ($it['id'] !== $id || in_array($it['stage'], ['done', 'cancelled'], true)) continue;
             $s['items'][$i]['stage'] = 'cancelled';
             queue_save($s);
             return true;
