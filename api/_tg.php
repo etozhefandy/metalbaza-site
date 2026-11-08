@@ -12,6 +12,7 @@
 // в личке, добавляет бота в группу и пишет там PIN. Привязка хранится в <папка данных сайта>/telegram.json.
 declare(strict_types=1);
 if (is_file(dirname(__DIR__) . '/_blog/site.php')) require_once dirname(__DIR__) . '/_blog/site.php';
+require_once __DIR__ . '/_foreign_leads.php';
 
 const TG_PIN_TTL = 900;        // PIN живёт 15 минут
 const TG_PIN_MAX_TRIES = 10;   // столько неверных PIN — и текущий сгорает
@@ -374,6 +375,11 @@ function tg_handle_update(array $u, ?callable $call = null, ?callable $on_button
     $from = (string) ($m['from']['id'] ?? '');
     $type = $m['chat']['type'] ?? '';
     $text = trim((string) ($m['text'] ?? ''));
+    // Чужой бот в группе (не наш) прислал что-то похожее на заявку — копируем её отдельно от наших.
+    if (in_array($type, ['group', 'supergroup'], true) && !empty($m['from']['is_bot'])) {
+        $our_bot_id = (int) strtok((string) (tg_cfg()['tg_token'] ?? ''), ':');
+        if ((int) ($m['from']['id'] ?? 0) !== $our_bot_id) foreign_lead_capture($m);
+    }
     if (isset($m['migrate_to_chat_id'])) {   // группа → супергруппа: переносим привязку сайта, чья это группа
         foreach (tg_sites() as $site) tg_on_site($site, function () use ($chat, $m) {
             if (tg_group() === $chat) tg_link_group((string) $m['migrate_to_chat_id'], (string) (tg_state()['lead_title'] ?? ''));
