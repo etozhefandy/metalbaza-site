@@ -6,7 +6,13 @@
 //
 // Хранится рядом с общими данными пульта (hub-data/foreign-leads.json) — одна точка для всех сайтов
 // хостинга, доступна только из пульта (admin.alfimov.kz), владельцу.
+//
+// Пульт в одном процессе подключает и свою копию этого файла, и копию сайта (admin сайта выполняется
+// внутри пульта — hub/pult.php: pult_site_admin). Это два разных файла на диске с одинаковыми функциями,
+// поэтому всё объявляем только при первой загрузке — иначе admin.alfimov.kz падал «Cannot redeclare» (см. _net.php).
 declare(strict_types=1);
+
+if (!function_exists('foreign_leads_dir')) {
 
 function foreign_leads_dir(): string
 {
@@ -87,4 +93,6 @@ function foreign_lead_set_status(string $id, string $status): bool
     $all[$id]['status'] = $status;
     foreign_leads_write($all);
     return true;
+}
+
 }
