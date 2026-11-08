@@ -21,6 +21,8 @@ function lead_add(array $f): ?array
         'message' => (string) ($f['message'] ?? ''),
         'source' => (string) ($f['source'] ?? ''),
         'consent' => !empty($f['consent']),
+        'geo_country' => (string) ($f['geo_country'] ?? ''),
+        'geo_city' => (string) ($f['geo_city'] ?? ''),
         'sent_to' => [],
     ];
     try {
@@ -67,10 +69,10 @@ function csv_cell($v): string
 
 function leads_csv(array $leads): string
 {
-    $rows = [['№', 'Дата', 'Телефон', 'Имя', 'Товар', 'Город', 'Комментарий', 'Страница', 'Кому передана']];
+    $rows = [['№', 'Дата', 'Телефон', 'Имя', 'Товар', 'Город', 'Комментарий', 'Страница', 'IP: город', 'IP: страна', 'Кому передана']];
     foreach ($leads as $l) {
         $rows[] = [$l['id'], str_replace('T', ' ', substr($l['at'], 0, 16)), $l['phone'], $l['name'], $l['product'], $l['city'],
-            $l['message'], $l['source'], implode(', ', (array) ($l['sent_to'] ?? []))];
+            $l['message'], $l['source'], (string) ($l['geo_city'] ?? ''), (string) ($l['geo_country'] ?? ''), implode(', ', (array) ($l['sent_to'] ?? []))];
     }
     $csv = "\xEF\xBB\xBF";
     foreach ($rows as $r) {

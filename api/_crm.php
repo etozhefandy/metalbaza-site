@@ -113,6 +113,8 @@ function crm_note(array $lead): string
     $l = ["Заявка с рекламной страницы: {$lead['page_title']}"];
     foreach ($lead['answers'] as [$label, $value]) $l[] = crm_label($label) . ": $value";
     foreach (['city' => 'Город', 'comment' => 'Комментарий'] as $k => $label) if (($lead[$k] ?? '') !== '') $l[] = "$label: {$lead[$k]}";
+    $geoLine = function_exists('lead_geo_line') ? lead_geo_line(['country' => $lead['geo_country'] ?? '', 'city' => $lead['geo_city'] ?? '']) : '';
+    if ($geoLine !== '') $l[] = "По IP: $geoLine";
     foreach ($lead['utm'] as $k => $v) $l[] = "$k: $v";
     return implode("\n", $l);
 }
@@ -244,6 +246,18 @@ function crm_check(array $c): array
             return $code ? ['ok' => true, 'lists' => []] : ['ok' => false, 'error' => "нет связи ($err)"];
     }
     return isset($l['error']) ? ['ok' => false, 'error' => $l['error']] : ['ok' => true, 'lists' => $l];
+}
+
+/** Что дописать в сообщение Telegram после попытки передать заявку в CRM. null — CRM не подключена, дописывать нечего. */
+function crm_status_text(string $client, array $r): ?string
+{
+    if (!empty($r['skipped'])) return null;
+    if (!empty($r['ok'])) {
+        $type = CRM_TYPES[crm_config($client)['type'] ?? ''] ?? 'CRM';
+        return "✅ Заявка ушла в $type" . (!empty($r['id']) ? " · №{$r['id']}" : '');
+    }
+    $esc = htmlspecialchars((string) ($r['error'] ?? ''), ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
+    return "⚠️ <b>Заявка не попала в CRM</b>: $esc\n\nВ Telegram она есть выше — перенесите вручную.";
 }
 
 /** Отправить заявку в CRM заказчика. Ничего не бросает. → ['ok', 'error'?, 'id'?, 'skipped'?]. */

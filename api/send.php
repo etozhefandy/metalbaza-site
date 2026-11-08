@@ -43,9 +43,12 @@ if ($phone === null) reply(false, 422);
 if (lead_rate_limited()) reply(false, 429);
 
 require __DIR__ . '/_tg.php';
+require __DIR__ . '/_geo.php';
 require_once dirname(__DIR__) . '/_blog/leads.php';
+$geo = lead_geo((string) ($_SERVER['REMOTE_ADDR'] ?? ''));
 $lead = lead_add(['phone' => $contact, 'name' => $name, 'product' => $product, 'city' => $city,
-    'message' => $message, 'source' => $source . ($lang !== '' && $lang !== 'ru' ? " ($lang)" : ''), 'consent' => SITE_LEAD_CONSENT]);
+    'message' => $message, 'source' => $source . ($lang !== '' && $lang !== 'ru' ? " ($lang)" : ''), 'consent' => SITE_LEAD_CONSENT,
+    'geo_country' => $geo['country'], 'geo_city' => $geo['city']]);
 
 $cfg = tg_cfg();
 if (empty($cfg['tg_token']) || empty($cfg['tg_chat'])) reply($lead !== null, $lead !== null ? 200 : 503);
@@ -57,8 +60,22 @@ $text = "🔥 <b>Новая заявка с " . SITE_HOST . "</b>" . ($lead ? " 
     . ($product !== '' ? "🧱 " . $esc($product) . "\n" : '')
     . ($city !== '' ? "📍 " . $esc($city) . "\n" : '')
     . ($message !== '' ? "💬 " . $esc($message) . "\n" : '')
+    . (lead_geo_line($geo) !== '' ? "🌍 По IP: " . $esc(lead_geo_line($geo)) . "\n" : '')
     . "\n📄 Страница: " . $esc($source) . ($lang !== '' ? " (" . $esc($lang) . ")" : '');
 
-$ok = tg_send_lead($text);
-// Заявка уже в журнале — даже если Telegram не ответил, она не потеряется.
-reply($ok || $lead !== null, ($ok || $lead !== null) ? 200 : 502);
+$sent = tg_send_lead($text);
+$ok = $sent !== [] || $lead !== null;
+// Заявка уже в журнале — даже если Telegram не ответил, она не потеряется. Человеку отвечаем сразу,
+// в CRM (если в пульте подключена для этого сайта) отправляем уже после ответа — не ждёт её заявитель.
+http_response_code($ok ? 200 : 502);
+echo json_encode(['ok' => $ok]);
+if (function_exists('fastcgi_finish_request')) fastcgi_finish_request();
+else { header('Connection: close'); header('Content-Length: ' . ob_get_length()); @ob_end_flush(); @flush(); }
+
+require_once __DIR__ . '/_crm.php';
+$crm = ['client' => SITE_HOST, 'client_name' => SITE_BRAND, 'page' => $source, 'page_title' => $source,
+    'name' => $name, 'phone' => $digits, 'answers' => $product !== '' ? [['Товар', $product]] : [],
+    'city' => $city, 'comment' => $message, 'utm' => [], 'geo_country' => $geo['country'], 'geo_city' => $geo['city']];
+$r = crm_send(SITE_HOST, $crm);
+if ($sent && ($status = crm_status_text(SITE_HOST, $r))) tg_edit_lead($sent, $text . "\n\n" . $status);
+exit;
