@@ -11,6 +11,7 @@ import base64
 import hashlib
 import html
 import json
+import re
 import shutil
 import subprocess
 import sys
@@ -304,6 +305,10 @@ def footer():
 
 
 def page(*, path, title, desc, body, schema, noindex=False, og_type="website", image=None):
+    if image is None:
+        card_title = re.sub(rf"\s*[|—]\s*({re.escape(cfg.BRAND)}|{re.escape(cfg.BRAND_UPPER)})\s*$",
+                             "", title, flags=re.I).strip() or title
+        image = enginekit.og_card(DIST, path, card_title, dark="#16191c", accent="#c2410c", domain=cfg.BRAND_UPPER)
     graph = {"@context": "https://schema.org", "@graph": [org_schema(), *schema]}
     graph_json = csp_hash(json.dumps(graph, ensure_ascii=False))
     robots = '<meta name="robots" content="noindex">' if noindex else ""
