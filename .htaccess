@@ -30,6 +30,7 @@ ErrorDocument 404 /404.html
   RewriteRule ^$ _blog/router.php?route=home [L]
   RewriteRule ^sitemap\.xml$ _blog/router.php?route=sitemap [L]
   RewriteRule ^llms\.txt$ _blog/router.php?route=llms [L]
+  RewriteRule ^llms-full\.txt$ _blog/router.php?route=llms-full [L]
   RewriteRule ^blog/$ _blog/router.php?route=index [L]
   RewriteRule ^blog/media/([A-Za-z0-9._-]+)$ _blog/router.php?route=media&f=$1 [L]
   RewriteRule ^blog/([a-z0-9-]+)/$ _blog/router.php?route=article&slug=$1 [L]

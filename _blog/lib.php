@@ -714,11 +714,47 @@ function render_llms(string $tpl, array $posts): string
     return str_replace('%%ARTICLES%%', $list, $tpl);
 }
 
+/**
+ * /llms-full.txt: та же справка о сайте (шапка, услуги, контакты из того же llms.tpl), но вместо
+ * ссылок на статьи — их содержимое целиком (markdown как есть, он и так для чтения, не для вёрстки).
+ * Смысл — по llmstxt.org: ИИ-ассистент получает ответ сразу, без отдельного захода на каждую статью.
+ */
+function render_llms_full(string $tpl, array $posts): string
+{
+    if (!$posts) return str_replace('%%ARTICLES%%', 'Статей пока нет.', $tpl);
+    $site = parts()['site_url'];
+    $blocks = array_map(function (array $a) use ($site) {
+        $out = '### ' . $a['title'] . "\n\n" . $site . article_path($a) . "\n\n";
+        if ($a['description'] !== '') $out .= $a['description'] . "\n\n";
+        return $out . trim($a['body_md']);
+    }, $posts);
+    return str_replace('%%ARTICLES%%', implode("\n\n---\n\n", $blocks), $tpl);
+}
+
 const INDEXNOW_KEY = SITE_INDEXNOW_KEY;  // из build.py (файл /<ключ>.txt)
+const INDEXNOW_REMOVED = 'removed';   // пометка в indexnow.json — отправлено как снятая страница, не статья
+
+/** Собственно вызов API IndexNow — без побочных эффектов, чистая отправка. */
+function indexnow_send(array $urlList, ?callable $send = null): bool
+{
+    $site = parts()['site_url'];
+    $body = json_encode(['host' => parse_url($site, PHP_URL_HOST), 'key' => INDEXNOW_KEY,
+        'keyLocation' => "$site/" . INDEXNOW_KEY . '.txt', 'urlList' => $urlList], JSON_UNESCAPED_SLASHES);
+    if ($send) return $send($body);
+    if (getenv('ALFIMOV_OFFLINE')) return false;   // тесты
+    $ch = curl_init('https://api.indexnow.org/indexnow');
+    curl_setopt_array($ch, [CURLOPT_POST => true, CURLOPT_POSTFIELDS => $body, CURLOPT_RETURNTRANSFER => true,
+        CURLOPT_TIMEOUT => 4, CURLOPT_CONNECTTIMEOUT => 3, CURLOPT_HTTPHEADER => ['Content-Type: application/json; charset=utf-8']]);
+    curl_exec($ch);
+    $code = (int) curl_getinfo($ch, CURLINFO_HTTP_CODE);
+    return $code >= 200 && $code < 300;
+}
 
 /**
  * IndexNow: сообщает Bing (на нём поиск ChatGPT и Copilot) и Яндексу о новой или изменённой статье,
  * чтобы её проиндексировали за часы, а не недели. Каждую версию статьи — один раз.
+ * «Отправлено» фиксируется только при успешном ответе API — неудачная попытка (сеть, таймаут,
+ * не-2xx) ничего не запоминает, и та же версия статьи уйдёт повторно на следующий вызов.
  */
 function indexnow_article(array $a, ?callable $send = null): bool
 {
@@ -728,18 +764,23 @@ function indexnow_article(array $a, ?callable $send = null): bool
     $file = DATA_DIR . '/indexnow.json';
     $sent = read_json($file) ?? [];
     if (($sent[$url] ?? '') === $a['updated_at']) return false;
-    $sent[$url] = $a['updated_at'];
-    write_json($file, $sent);
-    $body = json_encode(['host' => parse_url($site, PHP_URL_HOST), 'key' => INDEXNOW_KEY,
-        'keyLocation' => "$site/" . INDEXNOW_KEY . '.txt', 'urlList' => [$url, $site . blog_path(), "$site/"]], JSON_UNESCAPED_SLASHES);
-    if ($send) return $send($body);
-    if (getenv('ALFIMOV_OFFLINE')) return false;   // тесты
-    $ch = curl_init('https://api.indexnow.org/indexnow');
-    curl_setopt_array($ch, [CURLOPT_POST => true, CURLOPT_POSTFIELDS => $body, CURLOPT_RETURNTRANSFER => true,
-        CURLOPT_TIMEOUT => 4, CURLOPT_CONNECTTIMEOUT => 3, CURLOPT_HTTPHEADER => ['Content-Type: application/json; charset=utf-8']]);
-    curl_exec($ch);
-    $code = (int) curl_getinfo($ch, CURLINFO_HTTP_CODE);
-    return $code >= 200 && $code < 300;
+    $ok = indexnow_send([$url, $site . blog_path(), "$site/"], $send);
+    if ($ok) { $sent[$url] = $a['updated_at']; write_json($file, $sent); }
+    return $ok;
+}
+
+/**
+ * IndexNow для снятой/удалённой страницы: поисковик при следующем заходе увидит 404 и уберёт
+ * её из выдачи быстрее, а не будет неделями показывать мёртвую ссылку. Отправляется один раз.
+ */
+function indexnow_removed(string $url, ?callable $send = null): bool
+{
+    $file = DATA_DIR . '/indexnow.json';
+    $sent = read_json($file) ?? [];
+    if (($sent[$url] ?? '') === INDEXNOW_REMOVED) return false;
+    $ok = indexnow_send([$url], $send);
+    if ($ok) { $sent[$url] = INDEXNOW_REMOVED; write_json($file, $sent); }
+    return $ok;
 }
 
 // ---------------------------------------------------------------- картинки из админки

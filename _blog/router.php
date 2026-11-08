@@ -6,6 +6,7 @@
 //   /blog/media/*  → картинки, загруженные из админки
 //   /sitemap.xml   → карта сайта вместе со статьями
 //   /llms.txt      → справка о сайте для нейросетей (llmstxt.org) со списком статей
+//   /llms-full.txt → та же справка, но вместо ссылок на статьи — их содержимое целиком
 declare(strict_types=1);
 require __DIR__ . '/lib.php';
 
@@ -68,6 +69,11 @@ try {
             header('Content-Type: text/plain; charset=utf-8');
             header('Cache-Control: public, max-age=3600');
             echo render_llms((string) file_get_contents(__DIR__ . '/llms.tpl'), live_articles());
+            break;
+        case 'llms-full':
+            header('Content-Type: text/plain; charset=utf-8');
+            header('Cache-Control: public, max-age=3600');
+            echo render_llms_full((string) file_get_contents(__DIR__ . '/llms.tpl'), live_articles());
             break;
         case 'sitemap':
             header('Content-Type: application/xml; charset=utf-8');

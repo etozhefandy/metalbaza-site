@@ -315,7 +315,11 @@ try {
         reply(['article' => article_view($a)]);
     }
     if ($method === 'DELETE' && preg_match('#^api/articles/([a-z0-9-]+)$#', $route, $m)) {
-        if (!delete_article($m[1])) fail('Статья не найдена', 404);
+        $a = get_article($m[1]);
+        if (!$a || !delete_article($m[1])) fail('Статья не найдена', 404);
+        if (is_live($a)) {
+            try { indexnow_removed(parts()['site_url'] . article_path($a)); } catch (Throwable $ex) { error_log('indexnow: ' . $ex->getMessage()); }
+        }
         reply(['ok' => true]);
     }
     if ($method === 'POST' && $route === 'api/generate') reply(new_job('generate', generate_input(body())));
