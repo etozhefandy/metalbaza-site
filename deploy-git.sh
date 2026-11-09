@@ -41,11 +41,10 @@ echo "Ветка deploy обновлена (сборка из $SRC_SHA)"
     [ -n "$ID" ] && gh api -X POST "repos/$REPO_GH/hooks/$HOOK/deliveries/$ID/attempts" >/dev/null 2>&1
   fi
 ) >/dev/null 2>&1 &
-# IndexNow: сообщить Bing (поиск ChatGPT/Copilot) и Яндексу об обновлённых страницах. Plesk забирает
-# сборку ~10 секунд — пингуем в фоне чуть позже, чтобы роботы пришли уже на новую версию.
+# IndexNow: сообщить Bing (поиск ChatGPT/Copilot) и Яндексу об ИЗМЕНИВШИХСЯ страницах (не обо всех —
+# см. engine/indexnow_notify.py). Plesk забирает сборку ~10 секунд — пингуем в фоне чуть позже,
+# чтобы роботы пришли уже на новую версию.
 KEY=$(python3 -c "import sys; sys.path.insert(0, '$REPO'); import build; print(build.INDEXNOW_KEY)" 2>/dev/null || true)
 if [ -n "$KEY" ]; then
-  URLS=$(grep -o '<loc>[^<]*</loc>' "$REPO/dist/_blog/sitemap.tpl" | sed 's/<[^>]*>//g' | python3 -c "import sys, json; print(json.dumps([l.strip() for l in sys.stdin if l.strip()]))")
-  ( sleep 20; curl -s -o /dev/null -m 10 -X POST https://api.indexnow.org/indexnow -H 'Content-Type: application/json; charset=utf-8' \
-      -d "{\"host\":\"$HOST\",\"key\":\"$KEY\",\"keyLocation\":\"https://$HOST/$KEY.txt\",\"urlList\":$URLS}" ) >/dev/null 2>&1 &
+  ( sleep 20; python3 "$REPO/engine/indexnow_notify.py" "$REPO" "https://$HOST" "$KEY" ) >/dev/null 2>&1 &
 fi
