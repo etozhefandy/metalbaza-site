@@ -281,10 +281,11 @@ function crm_send(string $client, array $lead, bool $test = false): array
     return $r;
 }
 
-/** Условная заявка — проверить, что сделка создаётся. */
+/** Условная заявка — проверить, что сделка создаётся. Без привязки к отрасли конкретного заказчика —
+ * одна и та же функция шлёт тест и за рекламные страницы (разной тематики), и за сами сайты движка. */
 function crm_test_lead(string $client, string $clientName): array
 {
     return ['client' => $client, 'client_name' => $clientName, 'page' => 'test', 'page_title' => 'Тестовая заявка',
-        'name' => 'Тест Пульта', 'phone' => '77000000000', 'answers' => [['Объект', 'Отель / гостиница'], ['Нужно', 'Текстиль']],
-        'city' => 'Астана', 'comment' => 'Проверка подключения из пульта', 'utm' => ['utm_source' => 'facebook', 'utm_campaign' => 'test']];
+        'name' => 'Тест Пульта', 'phone' => '77000000000', 'answers' => [],
+        'city' => 'Астана', 'comment' => 'Проверка подключения из пульта: ' . $clientName, 'utm' => ['utm_source' => 'facebook', 'utm_campaign' => 'test']];
 }
