@@ -94,9 +94,10 @@ class BuildTest(unittest.TestCase):
         # Движок взят у alfimov.kz — в собранном сайте не должно остаться агентских адресов и текстов.
         # Исключения — комментарии о по-настоящему общей инфраструктуре хостинга, не копипаста контента:
         # _tg.php/prompts.php — общий бот (своя группа у каждого сайта); admin/index.php/auth.php/_csp.php/
-        # _hub.php/_net.php/_crm.php — единый пульт admin.alfimov.kz (движок один на все сайты хостинга).
+        # _hub.php/_net.php/_crm.php/_foreign_leads.php — единый пульт admin.alfimov.kz (движок один на все сайты хостинга).
         shared_infra = ("_tg.php", "admin.tpl", "prompts.php", "prompts.example.php",
-                         "index.php", "auth.php", "_csp.php", "_hub.php", "_net.php", "_crm.php")
+                         "index.php", "auth.php", "_csp.php", "_hub.php", "_net.php", "_crm.php",
+                         "_foreign_leads.php")
         for f in build.DIST.rglob("*"):
             if f.suffix in (".html", ".php", ".json", ".tpl", ".txt", ".js", ".css") and f.name not in shared_infra:
                 t = f.read_text(encoding="utf-8")

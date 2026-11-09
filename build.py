@@ -219,7 +219,7 @@ def header():
       <a href="/kak-rabotaet/">Как это работает</a>
       <a href="{BLOG_PATH}">{e(BLOG_UI['nav'])}</a>
       <a class="nav-tel" href="tel:{cfg.PHONE_TEL}">{cfg.PHONE_DISPLAY}</a>
-      <a class="btn btn-sm" href="#lead">{e(UI['cta'])}</a>
+      <a class="btn btn-sm" href="#lead-form">{e(UI['cta'])}</a>
     </nav>
     <button class="burger" type="button" aria-controls="nav" aria-expanded="false" aria-label="Меню">{icon('menu')}</button>
   </div>
@@ -263,7 +263,7 @@ def lead_form(source, title=None, lead=None, product="", city="", supplier=False
       <p>{e(lead)}</p>
       <div class="clinks">{contact_links()}</div>
     </div>
-    <form class="form rv" action="/api/send.php" method="post" data-ok="{e(UI['form_ok'])}" data-err="{e(UI['form_err'])}" data-sending="{e(UI['form_sending'])}" data-consent-err="{e(UI['form_consent_err'])}">
+    <form class="form rv" id="lead-form" action="/api/send.php" method="post" data-ok="{e(UI['form_ok'])}" data-err="{e(UI['form_err'])}" data-sending="{e(UI['form_sending'])}" data-consent-err="{e(UI['form_consent_err'])}">
       <input type="hidden" name="source" value="{e(source)}">
       <input type="hidden" name="ts" value="">
       <div class="hp" aria-hidden="true"><label>Company<input type="text" name="company" tabindex="-1" autocomplete="off"></label></div>{fields}
@@ -427,7 +427,7 @@ def data_table(t):
 
 def hero(trail, h1, lead, kicker=None, cta=True):
     k = f'<p class="hero-kicker rv">{e(kicker)}</p>' if kicker else ""
-    c = (f'<div class="hero-cta rv"><a class="btn btn-lg" href="#lead">{e(UI["cta"])} {icon("arrow", "ic ic-sm")}</a>'
+    c = (f'<div class="hero-cta rv"><a class="btn btn-lg" href="#lead-form">{e(UI["cta"])} {icon("arrow", "ic ic-sm")}</a>'
          f'<span class="hero-note">Бесплатно · ответ обычно в течение дня</span></div>') if cta else ""
     return f"""
 <section class="hero hero-svc">
@@ -498,7 +498,7 @@ def build_home():
     <div class="hero-row">
       <p class="hero-lead rv">Арматура, профнастил, трубы, лист, балка и швеллер. Напишите, что нужно, — поставщики вашего города пришлют цены, наличие и сроки доставки. Сравните и купите напрямую.</p>
       <div class="hero-cta rv">
-        <a class="btn btn-lg" href="#lead">{e(UI['cta'])} {icon('arrow', 'ic ic-sm')}</a>
+        <a class="btn btn-lg" href="#lead-form">{e(UI['cta'])} {icon('arrow', 'ic ic-sm')}</a>
         <a class="tlink" href="#katalog">Каталог</a>
       </div>
     </div>
