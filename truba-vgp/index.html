@@ -45,7 +45,7 @@
       <a href="/kak-rabotaet/">Как это работает</a>
       <a href="/blog/">Статьи</a>
       <a class="nav-tel" href="tel:+77769026669">+7 776 902 66 69</a>
-      <a class="btn btn-sm" href="#lead">Получить цены</a>
+      <a class="btn btn-sm" href="#lead-form">Получить цены</a>
     </nav>
     <button class="burger" type="button" aria-controls="nav" aria-expanded="false" aria-label="Меню"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 8h16M4 16h16"/></svg></button>
   </div>
@@ -58,7 +58,7 @@
     <h1 class="rv">Труба ВГП</h1>
     <div class="hero-row">
       <p class="hero-lead rv">Стальная труба для водопровода, отопления, газа и конструкций. Укажите условный проход, тип стенки и длину — получите цены поставщиков.</p>
-      <div class="hero-cta rv"><a class="btn btn-lg" href="#lead">Получить цены <svg class="ic ic-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg></a><span class="hero-note">Бесплатно · ответ обычно в течение дня</span></div>
+      <div class="hero-cta rv"><a class="btn btn-lg" href="#lead-form">Получить цены <svg class="ic ic-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg></a><span class="hero-note">Бесплатно · ответ обычно в течение дня</span></div>
     </div>
   </div>
 </section>
@@ -119,7 +119,7 @@
       <p>Опишите, что нужно, — заявку получат металлобазы вашего города и пришлют цены, наличие и сроки доставки. Для покупателя это бесплатно.</p>
       <div class="clinks"><a class="clink" href="tel:+77769026669"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 4h3.5l1.5 4.5-2 1.5a11 11 0 0 0 6 6l1.5-2 4.5 1.5V19a2 2 0 0 1-2 2A16 16 0 0 1 3 6a2 2 0 0 1 2-2Z"/></svg>+7 776 902 66 69</a><a class="clink" href="https://wa.me/77769026669" target="_blank" rel="noopener"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 20l1.2-4A8 8 0 1 1 8 18.8Z"/><path d="M9 9.5c0 3 2.5 5.5 5.5 5.5l1-1.5-2-1-1 .8c-1-.5-2-1.5-2.3-2.3l.8-1-1-2-1 .5Z"/></svg>WhatsApp</a></div>
     </div>
-    <form class="form rv" action="/api/send.php" method="post" data-ok="Заявка принята. Поставщики свяжутся с вами — обычно в течение рабочего дня." data-err="Не получилось отправить. Напишите нам в WhatsApp — ответим там." data-sending="Отправляем…" data-consent-err="Нужно согласие на передачу контактов поставщикам — иначе мы не сможем прислать цены.">
+    <form class="form rv" id="lead-form" action="/api/send.php" method="post" data-ok="Заявка принята. Поставщики свяжутся с вами — обычно в течение рабочего дня." data-err="Не получилось отправить. Напишите нам в WhatsApp — ответим там." data-sending="Отправляем…" data-consent-err="Нужно согласие на передачу контактов поставщикам — иначе мы не сможем прислать цены.">
       <input type="hidden" name="source" value="product:truba-vgp">
       <input type="hidden" name="ts" value="">
       <div class="hp" aria-hidden="true"><label>Company<input type="text" name="company" tabindex="-1" autocomplete="off"></label></div>
