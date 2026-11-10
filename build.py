@@ -322,6 +322,7 @@ def page(*, path, title, desc, body, schema, noindex=False, og_type="website", i
 <meta name="description" content="{e(desc)}">
 {robots}
 <link rel="canonical" href="{SITE_URL}{path}">
+<link rel="alternate" type="text/markdown" href="/llms.txt" title="llms.txt">
 <meta property="og:type" content="{og_type}">
 <meta property="og:site_name" content="{cfg.BRAND}">
 <meta property="og:locale" content="ru_KZ">
