@@ -173,6 +173,26 @@ function queue_cancel(string $id): bool
     });
 }
 
+/**
+ * Убрать разом все отклонённые темы (stage='error' — похоже на уже опубликованную статью и т.п.).
+ * Только «error»: статьи, которые реально встали в очередь («queued»), этой кнопкой не трогаем —
+ * их отменяют по одной («Отменить»), чтобы не снести случайно то, что уже реально пишется/ждёт дня.
+ */
+function queue_cancel_all(): int
+{
+    return queue_locked(function () {
+        $s = queue_state();
+        $n = 0;
+        foreach ($s['items'] ?? [] as $i => $it) {
+            if ($it['stage'] !== 'error') continue;
+            $s['items'][$i]['stage'] = 'cancelled';
+            $n++;
+        }
+        if ($n) queue_save($s);
+        return $n;
+    });
+}
+
 // ---------------------------------------------------------------- исполнение
 
 function queue_open(array $it): bool { return in_array($it['stage'], ['queued', 'working'], true); }

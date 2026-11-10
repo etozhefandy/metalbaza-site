@@ -369,6 +369,7 @@ body:not(.view-edit) .mbar { display: none !important; }
       <p class="hint" id="q-buffer-status" style="margin:8px 0 0"></p>
       <p class="hint" id="q-cover-status" style="margin:4px 0 0"></p>
       <ul class="qlist" id="q-list"></ul>
+      <button class="btn hidden" id="q-clear-errors" style="margin-top:8px">Убрать все отклонённые</button>
       <p class="hint" id="q-hint" style="margin:8px 0 0">Сюда попадает каждая статья, которую вы отправили писать: текст и обложка готовятся одновременно на сервере (страницу можно закрыть), затем статья сама встаёт на ближайший свободный день по ритму, 10:00. Автопилот держит запас готовых статей: если на ближайшую неделю вообще ничего не запланировано — по пятницам дописывает пачкой (не быстрее нескольких в день), пока не наберёт полный запас, остальное время молчит.</p>
     </section>
     <section class="card" id="list-card">
@@ -717,6 +718,9 @@ function renderQueue(d) {
     ${it.stage === "queued" ? `<button class="btn" data-qcancel="${it.id}">Отменить</button>` : ""}
     ${it.stage === "error" ? `<button class="btn" data-qcancel="${it.id}">Убрать</button>` : ""}</li>`).join("");
   $("q-list").classList.toggle("hidden", !items.length);
+  // кнопка смотрит на весь d.items (сервер хранит до 20), а не только на показанные 8 — иначе отклонённые
+  // за пределами видимого списка она не уберёт.
+  $("q-clear-errors").classList.toggle("hidden", !d.items.some(it => it.stage === "error"));
   if (!d.ready) $("q-hint").textContent = "Чтобы писать статьи, вставьте ключи Claude и OpenAI в «Настройках».";
   // только что готовые — в список статей и уведомление
   let fresh = false;
@@ -747,6 +751,13 @@ $("q-list").onclick = async e => {
   const o = e.target.closest("[data-qopen]"), c = e.target.closest("[data-qcancel]");
   if (o) { await load(o.dataset.qopen); return; }
   if (c) { try { renderQueue(await api(`${BASE}/api/queue/${c.dataset.qcancel}/cancel`, {method: "POST"})); } catch (err) { toast(err.message, true); } }
+};
+$("q-clear-errors").onclick = async () => {
+  try {
+    const d = await api(BASE + "/api/queue/errors/clear", {method: "POST"});
+    renderQueue(d);
+    toast(d.cancelled ? `Убрано отклонённых: ${d.cancelled}` : "Отклонённых тем больше нет");
+  } catch (err) { toast(err.message, true); }
 };
 const apSave = body => api(BASE + "/api/autopilot", {method: "POST", body: JSON.stringify(body)}).then(renderQueue).catch(e => toast(e.message, true));
 $("ap-on").onchange = () => { apSave({on: $("ap-on").checked}); toast($("ap-on").checked ? "Автопилот включён: будет держать запас готовых статей и дописывать его, когда он просядет" : "Автопилот выключен"); };

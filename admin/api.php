@@ -276,6 +276,9 @@ try {
         if (!queue_cancel($m[1])) fail('Эту статью уже не отменить');
         reply(queue_view());
     }
+    if ($method === 'POST' && $route === 'api/queue/errors/clear') {
+        reply(['cancelled' => queue_cancel_all()] + queue_view());
+    }
     if ($method === 'POST' && $route === 'api/autopilot') {
         $d = body();
         $s = settings();
