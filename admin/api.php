@@ -276,6 +276,10 @@ try {
         if (!queue_cancel($m[1])) fail('Эту статью уже не отменить');
         reply(queue_view());
     }
+    if ($method === 'POST' && preg_match('#^api/queue/([0-9a-f]{16})/force$#', $route, $m)) {
+        if (!queue_force_save($m[1])) fail('Текст этой статьи уже не сохранён — поставьте тему заново');
+        reply(queue_view());
+    }
     if ($method === 'POST' && $route === 'api/queue/errors/clear') {
         reply(['cancelled' => queue_cancel_all()] + queue_view());
     }

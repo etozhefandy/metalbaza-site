@@ -167,6 +167,7 @@ function queue_cancel(string $id): bool
             if ($it['id'] !== $id || in_array($it['stage'], ['done', 'cancelled'], true)) continue;
             $s['items'][$i]['stage'] = 'cancelled';
             queue_save($s);
+            queue_drop_files($id);
             return true;
         }
         return false;
@@ -186,11 +187,42 @@ function queue_cancel_all(): int
         foreach ($s['items'] ?? [] as $i => $it) {
             if ($it['stage'] !== 'error') continue;
             $s['items'][$i]['stage'] = 'cancelled';
+            queue_drop_files($it['id']);
             $n++;
         }
         if ($n) queue_save($s);
         return $n;
     });
+}
+
+/** Убрать черновые файлы задачи (текст, источник) — после отмены или когда задача выпала из истории. */
+function queue_drop_files(string $id): void
+{
+    @unlink(queue_dir() . "/{$id}-article.json");
+    @unlink(queue_dir() . "/{$id}-source.json");
+}
+
+/**
+ * «Всё равно сохранить»: статья отклонена как похожая на опубликованную (dup_title), но её текст сохранён
+ * (queue_finish не выбрасывает его при дубле) — сохраняем в план без проверки на дубль. Ничего не пишем заново.
+ */
+function queue_force_save(string $id): bool
+{
+    $item = null;
+    foreach (queue_state()['items'] ?? [] as $it) {
+        if ($it['id'] === $id && $it['stage'] === 'error' && !empty($it['dup_title'])) $item = $it;
+    }
+    if (!$item || !is_file(queue_dir() . "/{$id}-article.json")) return false;
+    queue_finish($item, true);
+    return true;
+}
+
+/** Статья блога по заголовку, который вернула проверка на дубль (ИИ может чуть изменить регистр/пробелы). */
+function article_slug_by_title(string $title): string
+{
+    $norm = fn($t) => preg_replace('/\s+/u', ' ', mb_strtolower(trim($t)));
+    foreach (load_all() as $a) if ($norm($a['title']) === $norm($title)) return $a['slug'];
+    return '';
 }
 
 // ---------------------------------------------------------------- исполнение
@@ -361,17 +393,23 @@ function queue_run_task(string $task, array $item, ?callable $post = null): arra
 }
 
 /** Текст и обложка готовы — сохранить статью в план на ближайший свободный день. */
-function queue_finish(array $item): void
+function queue_finish(array $item, bool $force = false): void
 {
     $a = read_json(queue_dir() . "/{$item['id']}-article.json") ?? [];
     $saved = null;
     $error = '';
+    $dupInfo = [];
     try {
-        $saved = queue_locked(function () use ($a, $item) {   // под замком: две статьи не займут один день
+        $saved = queue_locked(function () use ($a, $item, $force, &$dupInfo) {   // под замком: две статьи не займут один день
             $title = (string) ($a['title'] ?? $item['topic']);
             $keyword = (string) (($a['keywords'] ?? $item['keywords'] ?? [])[0] ?? '');
-            if (($dup = article_duplicate_check($title, $keyword)) !== null) {
-                throw new RuntimeException('Похоже на уже опубликованную статью «' . $dup . '» — не публикуем, поправьте тему и попробуйте снова.');
+            if (!$force && ($dup = article_duplicate_check($title, $keyword)) !== null) {
+                // текст не выбрасываем (он уже оплачен): в админке у такой статьи кнопки «Открыть похожую»,
+                // «Дополнить похожую этой темой» (по dup_outline — разделы новой статьи) и «Всё равно сохранить»
+                preg_match_all('/^#{2,3}\s+(.+)$/m', (string) ($a['body_md'] ?? ''), $h);
+                $dupInfo = ['dup_title' => $dup, 'dup_slug' => article_slug_by_title($dup),
+                    'dup_outline' => mb_substr(implode('; ', array_map('trim', $h[1] ?? [])), 0, 1200)];
+                throw new RuntimeException('Похоже на уже опубликованную статью «' . $dup . '» — не публикуем. Можно открыть её, дополнить её этой темой или всё равно сохранить новую.');
             }
             $slug = preg_match(SLUG_RE, (string) ($a['slug'] ?? '')) ? (string) $a['slug'] : slugify((string) ($a['title'] ?? $item['topic']));
             $base = $slug;
@@ -389,22 +427,23 @@ function queue_finish(array $item): void
     } catch (Throwable $ex) {
         $error = $ex->getMessage();
     }
-    queue_locked(function () use ($item, $saved, $error) {
+    queue_locked(function () use ($item, $saved, $error, $dupInfo) {
         $s = queue_state();
         foreach ($s['items'] ?? [] as $i => $it) {
             if ($it['id'] !== $item['id']) continue;
             $s['items'][$i]['stage'] = $saved ? 'done' : 'error';
             $s['items'][$i]['error'] = $error;
+            unset($s['items'][$i]['dup_title'], $s['items'][$i]['dup_slug'], $s['items'][$i]['dup_outline']);
+            if (!$saved && $dupInfo) $s['items'][$i] += $dupInfo;
             if ($saved) $s['items'][$i] = array_merge($s['items'][$i], ['slug' => $saved['slug'], 'title' => $saved['title'], 'publish_at' => $saved['publish_at']]);
         }
         // помним только последние готовые
         $done = array_keys(array_filter($s['items'] ?? [], fn($x) => !queue_open($x) && $x['stage'] !== 'finishing'));
-        foreach (array_slice($done, 0, max(0, count($done) - QUEUE_KEEP)) as $k) unset($s['items'][$k]);
+        foreach (array_slice($done, 0, max(0, count($done) - QUEUE_KEEP)) as $k) { queue_drop_files($s['items'][$k]['id']); unset($s['items'][$k]); }
         $s['items'] = array_values($s['items'] ?? []);
         queue_save($s);
     });
-    @unlink(queue_dir() . "/{$item['id']}-article.json");
-    @unlink(queue_dir() . "/{$item['id']}-source.json");
+    if (!$dupInfo) queue_drop_files($item['id']);   // при дубле текст ждёт решения («Всё равно сохранить»)
     if ($saved && $item['origin'] !== 'manual') queue_notify($saved, $item['cover_path'] !== '');
 }
 
@@ -619,7 +658,9 @@ function queue_view(): array
     $tries = (array) (queue_state()['cover_tries'] ?? []);
     $covers = array_values(array_filter(load_all(), fn($a) => $a['status'] === 'scheduled' && $a['cover_path'] === ''));
     return queue_settings() + ['items' => array_slice($items, 0, 20), 'pending' => $pending,
-        'ready' => autopilot_ready_count(), 'refilling' => !empty(queue_state()['buffer_refill']),
+        // 'ready' уже занят в queue_settings() (есть ли ключи), а «+» оставляет левое значение — поэтому
+        // число готовых статей отдельным полем, иначе в админке было «Запас: true из 12»
+        'ready_count' => autopilot_ready_count(), 'refilling' => !empty(queue_state()['buffer_refill']),
         'covers_missing' => count($covers),
         'covers_stuck' => count(array_filter($covers, fn($a) => (int) ($tries[$a['slug']] ?? 0) >= COVER_RETRY_MAX))];
 }
