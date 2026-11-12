@@ -57,11 +57,23 @@ try {
         case 'article':
             $a = get_article((string) ($_GET['slug'] ?? ''));
             // статья своего языка не на своём пути («/kz/blog/<ru-статья>/» и наоборот) — такой страницы нет
-            if (!$a || !is_live($a) || ($a['lang'] ?? 'ru') !== $lang) not_found();
+            if (!$a || !is_live($a) || ($a['lang'] ?? 'ru') !== $lang) {
+                // искажённый адрес статьи (ИИ ошибся в ссылке) — на похожую статью этого языка, иначе 404
+                $g = $a ? null : guess_article((string) ($_GET['slug'] ?? ''));
+                if ($g && ($g['lang'] ?? 'ru') === $lang) { header('Location: ' . article_path($g), true, 301); exit; }
+                not_found();
+            }
             send_html(render_article($a, live_articles(null, $lang)));
             // статья вышла по расписанию или обновилась — сообщить Bing и Яндексу (один раз на версию)
             try { indexnow_article($a); } catch (Throwable $ex) { error_log('indexnow: ' . $ex->getMessage()); }
             break;
+        case 'guess':
+            // адреса, которых нет (/slug/ без /blog/, искажённый адрес статьи — см. static/.htaccess сайта):
+            // похожая статья есть → постоянный редирект на неё, иначе обычная страница «не найдено»
+            $a = guess_article((string) ($_GET['slug'] ?? ''));
+            if (!$a) not_found();
+            header('Location: ' . article_path($a), true, 301);
+            exit;
         case 'media':
             send_media((string) ($_GET['f'] ?? ''));
             break;

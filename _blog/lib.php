@@ -267,6 +267,49 @@ function safe_url(string $u): string
     return preg_match('#^(https?://|/|\#|mailto:|tel:)#', $u) ? $u : '#';
 }
 
+/**
+ * Похожая вышедшая статья для адреса, которого нет: ИИ в статьях иногда ссылается на «/slug/» без «/blog/»
+ * или чуть искажает адрес («/blog/ugolok-razmery-tablica/» вместо «/blog/ugolok-razmery/»). Совпадение адреса
+ * целиком, иначе — по словам адреса (не меньше 60% общих слов и хотя бы 2 слова). null — похожей нет.
+ */
+function guess_article(string $slug): ?array
+{
+    $slug = strtolower(trim($slug, '/'));
+    if (!preg_match(SLUG_RE, $slug)) return null;
+    $a = get_article($slug);
+    if ($a && is_live($a)) return $a;
+    $live = live_articles();
+    $words = array_values(array_unique(array_filter(explode('-', $slug), fn($w) => strlen($w) > 1)));
+    $best = null; $bestScore = 0.0;
+    foreach ($live as $a) {
+        if ($a['slug'] === $slug) return $a;
+        $aw = array_values(array_unique(array_filter(explode('-', $a['slug']), fn($w) => strlen($w) > 1)));
+        $common = count(array_intersect($words, $aw));
+        $union = count(array_unique(array_merge($words, $aw)));
+        $score = $union ? $common / $union : 0.0;
+        if ($common >= 2 && $score > $bestScore) { $best = $a; $bestScore = $score; }
+    }
+    return $bestScore >= 0.6 ? $best : null;
+}
+
+/** Ссылка из текста статьи на свою же страницу, которой нет, → на похожую статью (см. guess_article). */
+function fix_internal_href(string $href): string
+{
+    if (preg_match('#^https?://' . preg_quote(SITE_HOST, '#') . '(/.*)?$#i', $href, $m)) $path = $m[1] ?? '/';
+    elseif (str_starts_with($href, '/') && !str_starts_with($href, '//')) $path = $href;
+    else return $href;
+    if (!preg_match('#^(/(?:kz/)?(?:blog/)?)([a-z0-9-]+)/?([?\#].*)?$#', $path, $m)) return $href;
+    [, $prefix, $slug] = $m;
+    $tail = $m[3] ?? '';
+    if ($prefix === '/' || $prefix === '/kz/') {
+        // настоящая страница сайта (/kontakty/, /armatura/ …) — не трогаем
+        if (is_file(SITE_DIR . $prefix . $slug . '/index.html') || is_file(SITE_DIR . $prefix . $slug)) return $href;
+    }
+    $a = guess_article($slug);
+    if (!$a) return $href;
+    return article_path($a) . $tail;
+}
+
 /** Инлайн-разметка поверх экранированного текста: `код`, **жирный**, *курсив*, [ссылка](url). */
 function md_inline(string $text): string
 {
@@ -277,7 +320,7 @@ function md_inline(string $text): string
     }, $text);
     $links = [];
     $text = preg_replace_callback('/\[([^\]]+)\]\(([^)\s]+)\)/u', function ($m) use (&$links) {
-        $href = safe_url($m[2]);
+        $href = fix_internal_href(safe_url($m[2]));
         $external = str_starts_with($href, 'http') && !str_contains($href, SITE_HOST);
         $rel = $external ? ' target="_blank" rel="noopener"' : '';
         $links[] = ['<a href="' . e($href) . '"' . $rel . '>', $m[1]];
