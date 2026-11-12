@@ -724,6 +724,7 @@ def build_404():
   </div>
 </section>
 <section class="sec"><div class="wrap">{catalog_grid()}</div></section>
+{lead_form('404', 'Есть вопросы?', 'Не нашли, что искали? Напишите, какой металл нужен, — металлобазы вашего города пришлют цены, наличие и сроки доставки.')}
 """
     return page(path="/404.html", title=f"404 — {cfg.BRAND}", desc=UI["not_found_text"], body=body, schema=[], noindex=True)
 

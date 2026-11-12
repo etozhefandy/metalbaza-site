@@ -47,6 +47,12 @@ ErrorDocument 404 /404.html
   RewriteCond %{REQUEST_FILENAME} !-f
   RewriteCond %{REQUEST_FILENAME} -d
   RewriteRule ^(.*[^/])$ /$1/ [L,R=301]
+
+  # Адрес из одного слова, которого нет (ИИ в статьях ссылался на «/slug/» без «/blog/»): если есть похожая
+  # статья — 301 на неё, иначе страница «не найдено» (engine: _blog/router.php route=guess)
+  RewriteCond %{REQUEST_FILENAME} !-f
+  RewriteCond %{REQUEST_FILENAME} !-d
+  RewriteRule ^([a-z0-9-]+)/?$ _blog/router.php?route=guess&slug=$1 [L]
 </IfModule>
 
 <IfModule mod_setenvif.c>
