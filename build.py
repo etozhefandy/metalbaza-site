@@ -344,7 +344,7 @@ def page(*, path, title, desc, body, schema, noindex=False, og_type="website", i
 <script type="application/ld+json">{graph_json}</script>
 </head>
 <body>
-{header()}
+{header().replace('href="#lead-form"', 'href="#lead-form"' if 'id="lead-form"' in body else 'href="/kontakty/#lead-form"')}
 <main>
 {body}
 </main>
