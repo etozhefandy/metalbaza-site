@@ -34,5 +34,5 @@
 <url><loc>https://metalbaza.kz/kak-rabotaet/</loc><lastmod>2026-11-10</lastmod></url>
 <url><loc>https://metalbaza.kz/postavshchikam/</loc><lastmod>2026-11-10</lastmod></url>
 <url><loc>https://metalbaza.kz/kontakty/</loc><lastmod>2026-11-10</lastmod></url>
-<url><loc>https://metalbaza.kz/politika-konfidencialnosti/</loc><lastmod>2026-11-10</lastmod></url>
+<url><loc>https://metalbaza.kz/politika-konfidencialnosti/</loc><lastmod>2026-11-12</lastmod></url>
 </urlset>
