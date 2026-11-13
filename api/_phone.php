@@ -23,11 +23,12 @@ function lead_phone(string $contact): ?array
 /** Не больше $max заявок с одного IP за 10 минут на сайт (и $max*3 на все сайты хостинга вместе). → true, если лимит превышен.
  *  Проверка и запись — под блокировкой файла: пачка параллельных запросов не проскочит лимит. IP — только REMOTE_ADDR
  *  (заголовкам X-Forwarded-For не верим). Не удалось открыть счётчик — пишем в лог и пропускаем заявку: потерять клиента хуже. */
-function lead_rate_limited(int $max = 5, string $scope = ''): bool
+function lead_rate_limited(int $max = 5, string $scope = '', bool $global = true): bool
 {
     $ip = (string) ($_SERVER['REMOTE_ADDR'] ?? 'unknown');
     $scope = $scope !== '' ? $scope : strtolower((string) ($_SERVER['HTTP_HOST'] ?? ''));
-    $limits = [md5("site|$scope|$ip") => $max, md5("all|$ip") => $max * 3];
+    // $global = false — только свой счётчик (клики по кнопкам не должны съедать лимит заявок с формы)
+    $limits = [md5("site|$scope|$ip") => $max] + ($global ? [md5("all|$ip") => $max * 3] : []);
     $dir = getenv('ALFIMOV_RL_DIR') ?: sys_get_temp_dir();
     $now = time();
     $handles = [];

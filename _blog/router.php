@@ -14,7 +14,9 @@ function not_found(): void
 {
     http_response_code(404);
     header('Content-Type: text/html; charset=utf-8');
-    readfile(SITE_DIR . '/404.html');
+    // у сайта может быть своя страница «не найдено» для казахской версии (/kz/404.html)
+    $kz = SITE_DIR . '/kz/404.html';
+    readfile(str_starts_with((string) ($_SERVER['REQUEST_URI'] ?? ''), '/kz/') && is_file($kz) ? $kz : SITE_DIR . '/404.html');
     exit;
 }
 

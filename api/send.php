@@ -33,6 +33,9 @@ $product = $field('product', 80);
 $city = $field('city', 60);
 $source = $field('source', 80);
 $lang = $field('lang', 5);
+// откуда человек пришёл и с какой страницы начал (main.js сайта: visit_from / visit_first)
+$from = $field('visit_from', 60);
+$first = $field('visit_first', 120);
 if ($contact === '' || (SITE_LEAD_NAME && $name === '')) reply(false, 422);
 // Согласие на передачу контактов третьим лицам (поставщикам) — по закону РК о персональных данных.
 if (SITE_LEAD_CONSENT && $field('consent', 5) !== '1') reply(false, 422);
@@ -61,7 +64,9 @@ $text = "🔥 <b>Новая заявка с " . SITE_HOST . "</b>" . ($lead ? " 
     . ($city !== '' ? "📍 " . $esc($city) . "\n" : '')
     . ($message !== '' ? "💬 " . $esc($message) . "\n" : '')
     . (lead_geo_line($geo) !== '' ? "🌍 По IP: " . $esc(lead_geo_line($geo)) . "\n" : '')
-    . "\n📄 Страница: " . $esc($source) . ($lang !== '' ? " (" . $esc($lang) . ")" : '');
+    . "\n📄 Страница: " . $esc($source) . ($lang !== '' ? " (" . $esc($lang) . ")" : '')
+    . ($from !== '' ? "\n🧭 Откуда пришёл: " . $esc($from) : '')
+    . ($first !== '' ? "\n🚪 Первая страница: " . $esc($first) : '');
 
 $sent = tg_send_lead($text);
 $ok = $sent !== [] || $lead !== null;
