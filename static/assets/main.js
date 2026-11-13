@@ -1,4 +1,45 @@
 (function () {
+  // Откуда пришёл человек и с какой страницы начал — запоминаем на первой странице визита. Уходит в Telegram
+  // вместе с заявкой (send.php: visit_from/visit_first) и при нажатии важных кнопок (api/click.php).
+  var visit = (function () {
+    var v = null;
+    try { v = JSON.parse(sessionStorage.getItem("visit") || "null"); } catch (e) {}
+    if (v && v.from) return v;
+    var q = new URLSearchParams(location.search), ref = "";
+    try { ref = document.referrer ? new URL(document.referrer).hostname.replace(/^www\./, "") : ""; } catch (e) {}
+    if (ref === location.hostname) ref = "";
+    var names = [[/2gis|^dgis/, "2ГИС"], [/google\./, "Google"], [/yandex\.|ya\.ru/, "Яндекс"], [/instagram\./, "Instagram"],
+      [/facebook\.|fb\.|messenger\./, "Facebook"], [/^t\.me$|telegram/, "Telegram"], [/whatsapp|wa\.me/, "WhatsApp"],
+      [/bing\./, "Bing"], [/chatgpt\.|openai\./, "ChatGPT"], [/perplexity\./, "Perplexity"], [/gemini\.|bard\./, "Gemini"],
+      [/claude\.ai/, "Claude"], [/tiktok\./, "TikTok"], [/youtube\.|youtu\.be/, "YouTube"], [/olx\./, "OLX"], [/vk\.com/, "VK"]];
+    var from = "";
+    var nice = function (x) { var r = x; names.some(function (n) { if (n[0].test(x.toLowerCase())) { r = n[1]; return true; } }); return r; };
+    if (q.get("utm_source")) from = nice(q.get("utm_source")) + (q.get("utm_medium") ? " / " + q.get("utm_medium") : "") + (q.get("utm_campaign") ? " / " + q.get("utm_campaign") : "");
+    else if (q.get("fbclid")) from = "Реклама Meta (Facebook/Instagram)";
+    else if (q.get("gclid")) from = "Реклама Google";
+    else if (q.get("yclid")) from = "Реклама Яндекса";
+    else if (ref) from = nice(ref);
+    else from = "Прямой заход (набрали адрес, закладка или приложение)";
+    v = { from: from.slice(0, 60), first: (location.pathname + location.search).slice(0, 200) };
+    try { sessionStorage.setItem("visit", JSON.stringify(v)); } catch (e) {}
+    return v;
+  })();
+  // Важные кнопки (WhatsApp, Telegram, звонок, Instagram, почта) → уведомление владельцу в Telegram
+  document.addEventListener("click", function (ev) {
+    var a = ev.target.closest && ev.target.closest("a[href]");
+    if (!a || !navigator.sendBeacon) return;
+    var h = a.getAttribute("href") || "", kind = "";
+    if (/^(https?:\/\/)?(wa\.me|api\.whatsapp\.com|web\.whatsapp\.com)|^whatsapp:/i.test(h)) kind = "whatsapp";
+    else if (/^(https?:\/\/)?(t\.me|telegram\.me)\/|^tg:/i.test(h)) kind = "telegram";
+    else if (/^tel:/i.test(h)) kind = "call";
+    else if (/^(https?:\/\/)?(www\.)?instagram\.com\//i.test(h)) kind = "instagram";
+    else if (/^mailto:/i.test(h)) kind = "email";
+    if (!kind) return;
+    var d = new FormData();
+    d.append("kind", kind); d.append("href", h.slice(0, 300)); d.append("page", location.pathname);
+    d.append("first", visit.first); d.append("from", visit.from);
+    try { navigator.sendBeacon("/api/click.php", d); } catch (e) {}
+  }, true);
   // Шрифты грузятся как media="print" (не блокируют рендер), здесь включаем media="all" — раньше это было
   // inline onload="" на самом <link>, но CSP script-src-attr без unsafe-inline/unsafe-hashes такое блокирует.
   document.querySelectorAll(".js-async-css").forEach(function (l) {
@@ -137,6 +178,7 @@
         return;
       }
       var data = new FormData(form);
+      data.append("visit_from", visit.from); data.append("visit_first", visit.first);
       if (iti) data.set("contact", iti.getNumber() || phone.value);
       btn.disabled = true;
       btn.textContent = form.dataset.sending;
