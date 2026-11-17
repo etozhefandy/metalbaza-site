@@ -25,6 +25,9 @@ ErrorDocument 404 /404.html
   RewriteCond %{ENV:REDIRECT_STATUS} ^$
   RewriteRule ^_blog/ - [R=404,L]
   RewriteRule ^api/(_|config\.php) - [R=404,L]
+  # Дубли статей (вышли повторно с тем же заголовком, 05.11 и 10.11.2026) → на первую статью
+  RewriteRule ^blog/sortament-armatury-razmery-diametry-klassy-2/?$ /blog/sortament-armatury-razmery-diametry-klassy/ [L,R=301]
+  RewriteRule ^blog/truba-vgp-razmery-gost-3262-75-2/?$ /blog/truba-vgp-razmery-gost-3262-75/ [L,R=301]
   RewriteRule ^blog$ /blog/ [L,R=301]
   RewriteRule ^blog/([a-z0-9-]+)$ /blog/$1/ [L,R=301]
   RewriteRule ^$ _blog/router.php?route=home [L]

@@ -403,7 +403,12 @@ function queue_finish(array $item, bool $force = false): void
         $saved = queue_locked(function () use ($a, $item, $force, &$dupInfo) {   // под замком: две статьи не займут один день
             $title = (string) ($a['title'] ?? $item['topic']);
             $keyword = (string) (($a['keywords'] ?? $item['keywords'] ?? [])[0] ?? '');
-            if (!$force && ($dup = article_duplicate_check($title, $keyword)) !== null) {
+            // точно такой же заголовок или адрес уже есть — дубль без вопросов к ИИ (ИИ-проверка при сбое
+            // пропускает статью — так на metalbaza вышли «…-2» с тем же заголовком, что у статьи двумя днями раньше)
+            $baseSlug = preg_match(SLUG_RE, (string) ($a['slug'] ?? '')) ? (string) $a['slug'] : slugify($title);
+            $same = article_slug_by_title($title) ?: (get_article($baseSlug) ? $baseSlug : '');
+            $dup = $force ? null : ($same !== '' ? (string) get_article($same)['title'] : article_duplicate_check($title, $keyword));
+            if ($dup !== null) {
                 // текст не выбрасываем (он уже оплачен): в админке у такой статьи кнопки «Открыть похожую»,
                 // «Дополнить похожую этой темой» (по dup_outline — разделы новой статьи) и «Всё равно сохранить»
                 preg_match_all('/^#{2,3}\s+(.+)$/m', (string) ($a['body_md'] ?? ''), $h);
