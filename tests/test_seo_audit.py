@@ -11,11 +11,12 @@ import seo_audit  # noqa: E402
 GOOD_DESC = "Описание страницы нормальной длины для поисковой выдачи, чтобы проверка не ругалась на слишком короткий текст."
 
 
-def page(title, h1=1, desc=GOOD_DESC, body="", links=()):
+def page(title, h1=1, desc=GOOD_DESC, body="", links=(), path=None):
     heads = "".join("<h1>Заголовок</h1>" for _ in range(h1))
     a = "".join(f'<a href="{x}">x</a>' for x in links)
     words = " ".join(["слово"] * 350)
-    return (f'<html><head><title>{title}</title><meta name="description" content="{desc}"></head>'
+    canon = f'<link rel="canonical" href="https://x.kz{path}">' if path else ""
+    return (f'<html><head><title>{title}</title><meta name="description" content="{desc}">{canon}</head>'
             f"<body><main>{heads}{body}<p>{words}</p>{a}</main></body></html>")
 
 
@@ -29,8 +30,8 @@ class AuditRulesTest(unittest.TestCase):
         return {(i.severity, i.title) for i in seo_audit.audit(d)}, seo_audit.audit(d)
 
     def test_clean_pair(self):
-        found, _ = self.make({"index.html": page("Главная страница агентства", links=["/a/"]),
-                              "a/index.html": page("Страница услуги агентства", links=["/"], desc=GOOD_DESC + " Услуга.")})
+        found, _ = self.make({"index.html": page("Главная страница агентства", links=["/a/"], path="/"),
+                              "a/index.html": page("Страница услуги агентства", links=["/"], desc=GOOD_DESC + " Услуга.", path="/a/")})
         self.assertEqual(found, set())
 
     def test_detects_problems(self):
